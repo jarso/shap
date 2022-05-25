@@ -2,16 +2,16 @@
 -e .
 
 # For running tests
-# nose
+nose
 
 # For neural network examples
-# keras
-# tensorflow
-# torch
-# torchvision
-# transformers
+keras
+tensorflow
+torch
+torchvision
+transformers
 
 # For decision tree examples
-# xgboost
-# catboost
-# lightgbm
+xgboost
+catboost
+lightgbm

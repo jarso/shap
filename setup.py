@@ -296,6 +296,6 @@ def try_run_setup(**kwargs):
 if __name__ == "__main__":
     try_run_setup(
         with_binary=True, test_xgboost=True, test_lightgbm=True, test_catboost=True,
-        test_spark=True, test_pyod=True, with_cuda=True, test_transformers=True, test_pytorch=True,
+        test_spark=True, test_pyod=True, with_cuda=False, test_transformers=True, test_pytorch=True,
         test_sentencepiece=True, test_opencv=True
     )

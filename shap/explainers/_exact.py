@@ -15,7 +15,7 @@ class Exact(Explainer):
     This works well for standard Shapley value maskers for models with less than ~15 features that vary
     from the background per sample. It also works well for Owen values from hclustering structured
     maskers when there are less than ~100 features that vary from the background per sample. This
-    explainer minmizes the number of function evaluations needed by ordering the masking sets to
+    explainer minimizes the number of function evaluations needed by ordering the masking sets to
     minimize sequential differences. This is done using gray codes for standard Shapley values
     and a greedly sorting method for hclustering structured maskers.
     """
@@ -52,6 +52,7 @@ class Exact(Explainer):
         """ # TODO link to the link linearization paper when done
         super().__init__(model, masker, link=link, linearize_link=linearize_link, feature_names=feature_names)
 
+        print("uruchomiono zmieniony")
         self.model = Model(model)
 
         if getattr(masker, "clustering", None) is not None:

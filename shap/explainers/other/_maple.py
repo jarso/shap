@@ -272,6 +272,8 @@ class MAPLE:
         return out
 
     def predict(self, X):
+        print("here1")
+
         n = X.shape[0]
         pred = np.zeros(n)
         for i in range(n):

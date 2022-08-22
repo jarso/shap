@@ -23,6 +23,8 @@ class KerasWrap(object):
         return self.model.fit(X, y, epochs=self.epochs, verbose=verbose)
 
     def predict(self, X):
+        print("here2")
+
         X = self.scaler.transform(X)
         if self.flatten_output:
             return self.model.predict(X).flatten()

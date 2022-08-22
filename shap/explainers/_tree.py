@@ -387,6 +387,7 @@ class Tree(Explainer):
 
         # run the core algorithm using the C extension
         assert_import("cext")
+        print("using treeshap and cext")
         phi = np.zeros((X.shape[0], X.shape[1]+1, self.model.num_outputs))
         if not approximate:
             _cext.dense_tree_shap(
@@ -1069,6 +1070,7 @@ class TreeEnsemble:
             Limit the number of trees used by the model. By default None means no use the limit of the
             original model, and -1 means no limit.
         """
+        print("here37")
 
         if output is None:
             output = self.model_output

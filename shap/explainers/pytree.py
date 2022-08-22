@@ -1,11 +1,11 @@
 """
 This module is a pure python implementation of Tree SHAP.
 It is primarily for illustration since it is slower than the 'tree'
-module which uses a compiled C++ implmentation.
+module which uses a compiled C++ implementation.
 """
 import numpy as np
 #import numba
-from .explainer import Explainer
+# from .explainer import Explainer
 
 # class TreeExplainer(Explainer):
 #     def __init__(self, model, **kwargs):
@@ -142,9 +142,9 @@ class TreeExplainer:
     def __init__(self, model, **kwargs):
         self.model_type = "internal"
 
-        if str(type(model)).endswith("sklearn.ensemble.forest.RandomForestRegressor'>"):
+        if str(type(model)).endswith("sklearn.ensemble._forest.RandomForestRegressor'>"):
             self.trees = [Tree(e.tree_) for e in model.estimators_]
-        elif str(type(model)).endswith("sklearn.ensemble.forest.RandomForestClassifier'>"):
+        elif str(type(model)).endswith("sklearn.ensemble._forest.RandomForestClassifier'>"):
             self.trees = [Tree(e.tree_, normalize=True) for e in model.estimators_]
         elif str(type(model)).endswith("xgboost.core.Booster'>"):
             self.model_type = "xgboost"
@@ -165,6 +165,7 @@ class TreeExplainer:
             self.pweights = np.zeros(s, dtype=np.float64)
 
     def shap_values(self, X, tree_limit=-1, **kwargs):
+        print("oryginalna implemenacja shap_values")
 
         # shortcut using the C++ version of Tree SHAP in XGBoost and LightGBM
         # these are about 10x faster than the numba jit'd implementation below...
@@ -174,10 +175,13 @@ class TreeExplainer:
                 X = xgboost.DMatrix(X)
             if tree_limit==-1:
                 tree_limit=0
+            print("xgboost model type")
             return self.trees.predict(X, ntree_limit=tree_limit, pred_contribs=True)
         elif self.model_type == "lightgbm":
+            print("lightgbm model type")
             return self.trees.predict(X, num_iteration=tree_limit, pred_contrib=True)
 
+        print("other model type")
         # convert dataframes
         if str(type(X)).endswith("pandas.core.series.Series'>"):
             X = X.values
@@ -189,6 +193,7 @@ class TreeExplainer:
 
         n_outputs = self.trees[0].values.shape[1]
 
+        print("using slow python treeshap")
         # single instance
         if len(X.shape) == 1:
 
@@ -230,6 +235,7 @@ class TreeExplainer:
             raise Exception("Interaction values not yet supported for model type: " + str(type(X)))
 
     def tree_shap(self, tree, x, x_missing, phi, condition=0, condition_feature=0):
+        # print("oryginalna implementacja")
 
         # update the bias term, which is the last index in phi
         # (note the paper has this as phi_0 instead of phi_M)
@@ -243,6 +249,28 @@ class TreeExplainer:
             x, x_missing, phi, 0, 0, self.feature_indexes, self.zero_fractions, self.one_fractions, self.pweights,
             1, 1, -1, condition, condition_feature, 1
         )
+
+class BanzTreeExplainer(TreeExplainer):
+    def __str__(self):
+        return "banzhaf"
+
+    def tree_shap(self, tree, x, x_missing, phi, condition=0, condition_feature=0):
+        print("moja implementacja")
+
+        # update the bias term, which is the last index in phi
+        # (note the paper has this as phi_0 instead of phi_M)
+        if condition == 0:
+            phi[-1,:] += tree.values[0,:]
+
+        # start the recursive algorithm
+        tree_shap_recursive(
+            tree.children_left, tree.children_right, tree.children_default, tree.features,
+            tree.thresholds, tree.values, tree.node_sample_weight,
+            x, x_missing, phi, 0, 0, self.feature_indexes, self.zero_fractions, self.one_fractions, self.pweights,
+            1, 1, -1, condition, condition_feature, 1
+        )
+
+
 
 
 # extend our decision path with a fraction of one and zero extensions

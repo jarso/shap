@@ -47,8 +47,8 @@ class Tree(Explainer):
     """ Uses Tree SHAP algorithms to explain the output of ensemble tree models.
 
     Tree SHAP is a fast and exact method to estimate SHAP values for tree models and ensembles of trees,
-    under several different possible assumptions about feature dependence. It depends on fast C++
-    implementations either inside an externel model package or in the local compiled C extention.
+    under several possible assumptions about feature dependence. It depends on fast C++
+    implementations either inside an external model package or in the local compiled C extension.
     """
 
     def __init__(self, model, data = None, model_output="raw", feature_perturbation="interventional", feature_names=None, approximate=False, **deprecated_options):

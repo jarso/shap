@@ -4,6 +4,7 @@ It is primarily for illustration since it is slower than the 'tree'
 module which uses a compiled C++ implementation.
 """
 import numpy as np
+from collections import deque as stack
 #import numba
 # from .explainer import Explainer
 
@@ -221,6 +222,81 @@ class TreeExplainer:
             else:
                 return [phi[:, :, i] for i in range(n_outputs)]
 
+    def banz_values(self, X, tree_limit=-1, **kwargs):
+        print("nasza implementacja banz values")
+
+        # shortcut using the C++ version of Tree SHAP in XGBoost and LightGBM
+        # these are about 10x faster than the numba jit'd implementation below...
+        if self.model_type == "xgboost":
+            import xgboost
+            if not str(type(X)).endswith("xgboost.core.DMatrix'>"):
+                X = xgboost.DMatrix(X)
+            if tree_limit==-1:
+                tree_limit=0
+            print("xgboost model type")
+            return self.trees.predict(X, ntree_limit=tree_limit, pred_contribs=True)
+        elif self.model_type == "lightgbm":
+            print("lightgbm model type")
+            return self.trees.predict(X, num_iteration=tree_limit, pred_contrib=True)
+
+        print("other model type")
+        # convert dataframes
+        if str(type(X)).endswith("pandas.core.series.Series'>"):
+            X = X.values
+        elif str(type(X)).endswith("pandas.core.frame.DataFrame'>"):
+            X = X.values
+
+        assert str(type(X)).endswith("'numpy.ndarray'>"), "Unknown instance type: " + str(type(X))
+        assert len(X.shape) == 1 or len(X.shape) == 2, "Instance must have 1 or 2 dimensions!"
+
+        n_outputs = self.trees[0].values.shape[1]
+
+        print("uzywajac pythonowego banzhafa")
+        # single instance
+        if (len(X.shape) == 1) or (len(X.shape) == 2):
+
+            betas = [] # np.zeros(X.shape[0] + 1, n_outputs)
+            deltas = [] # np.zeros(X.shape[0] + 1, n_outputs)
+            deltas_star = []
+            H = []
+            B = []
+            for i in range(X.shape[0] + 1):
+                H.append(stack())
+
+            x_missing = [] # np.zeros(X.shape[0], dtype=np.bool)
+
+            features_list = {}
+            for t in self.trees:
+                for i in t.features:
+                    features_list[i] = True
+            print("features_list:", features_list)
+
+            features = features_list.keys() # TODO to maja byc features dla calego datasetu globalne
+            # print(features)
+            # features to tablice intow, features[i] mowi na podst. jakiego featura dzieli probki wezel i w drzewie
+            self.tree_banz(self.trees, X, features, betas, deltas, deltas_star, H, B)
+
+            return betas
+            # if n_outputs == 1:
+            #     return phi[:, 0]
+            # else:
+            #     return [phi[:, i] for i in range(n_outputs)]
+
+        elif len(X.shape) == 2:
+            print("dwa wymiary")
+            return []
+        #     phi = np.zeros((X.shape[0], X.shape[1] + 1, n_outputs))
+        #     x_missing = np.zeros(X.shape[1], dtype=np.bool)
+        #     for i in range(X.shape[0]):
+        #         for t in self.trees:
+        #             self.tree_shap(t, X[i,:], x_missing, phi[i,:,:])
+        #     phi /= len(self.trees)
+        #
+        #     if n_outputs == 1:
+        #         return phi[:, :, 0]
+        #     else:
+        #         return [phi[:, :, i] for i in range(n_outputs)]
+
     def shap_interaction_values(self, X, tree_limit=-1, **kwargs):
 
         # shortcut using the C++ version of Tree SHAP in XGBoost and LightGBM
@@ -235,7 +311,7 @@ class TreeExplainer:
             raise Exception("Interaction values not yet supported for model type: " + str(type(X)))
 
     def tree_shap(self, tree, x, x_missing, phi, condition=0, condition_feature=0):
-        # print("oryginalna implementacja")
+        print("oryginalna implementacja")
 
         # update the bias term, which is the last index in phi
         # (note the paper has this as phi_0 instead of phi_M)
@@ -249,6 +325,22 @@ class TreeExplainer:
             x, x_missing, phi, 0, 0, self.feature_indexes, self.zero_fractions, self.one_fractions, self.pweights,
             1, 1, -1, condition, condition_feature, 1
         )
+
+    def tree_banz(self, trees, features, X, betas, deltas, deltas_star, H, B):
+        for i in features:
+            betas[i] = 0
+            deltas[i] = 0
+            H[i] = stack()
+        F = []
+        for t in trees:
+            p = 0 # root ma zawsze id == 0
+            for v in [t.children_left[p], t.children_right[p]]:
+                traverse(v, t, features, X, betas, deltas, H, B)
+                fast(v, t, features, X, betas, deltas, H, B)
+            for v in range(1, len(t.children_right)):
+                diff = 2 * (deltas_star[v] - 1) / (1 + deltas_star[v]) * B[v] # TODO deltas z * sa w algorytmie
+                betas[v] += diff
+        return list(map(lambda x: x / len(trees), betas))
 
 class BanzTreeExplainer(TreeExplainer):
     def __str__(self):
@@ -476,3 +568,16 @@ def tree_shap_recursive(children_left, children_right, children_default, feature
             cold_zero_fraction * incoming_zero_fraction, 0,
             split_index, condition, condition_feature, cold_condition_fraction
         )
+
+def tree_banz_recursive(children_left, children_right, children_default, features, thresholds, values, node_sample_weight,
+                        x, x_missing, phi, node_index, unique_depth, parent_feature_indexes,
+                        parent_zero_fractions, parent_one_fractions, parent_pweights, parent_zero_fraction,
+                        parent_one_fraction, parent_feature_index, condition, condition_feature, condition_fraction):
+    pass
+
+
+def traverse(node, tree, features, X, betas, deltas, H, B):
+    pass
+
+def fast(node, tree, features, X, betas, deltas, H, B):
+    pass

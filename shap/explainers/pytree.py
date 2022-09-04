@@ -142,6 +142,7 @@ class TreeExplainer:
 
     def __init__(self, model, **kwargs):
         self.model_type = "internal"
+        print("nowy treexplainer")
 
         if str(type(model)).endswith("sklearn.ensemble._forest.RandomForestRegressor'>"):
             self.trees = [Tree(e.tree_) for e in model.estimators_]
@@ -254,12 +255,14 @@ class TreeExplainer:
         print("uzywajac pythonowego banzhafa")
         # single instance
         if (len(X.shape) == 1) or (len(X.shape) == 2):
+            if len(X.shape) == 2:
+                print("dwa wymiary ale tutaj")
+            betas = np.zeros(X.shape[0] + 1, dtype=np.int32)
+            deltas = np.zeros(X.shape[0] + 1, dtype=np.int32)
+            deltas_star = np.zeros(X.shape[0] + 1, dtype=np.int32)
+            B = np.zeros(X.shape[0] + 1, dtype=np.int32)
 
-            betas = [] # np.zeros(X.shape[0] + 1, n_outputs)
-            deltas = [] # np.zeros(X.shape[0] + 1, n_outputs)
-            deltas_star = []
             H = []
-            B = []
             for i in range(X.shape[0] + 1):
                 H.append(stack())
 
@@ -274,7 +277,7 @@ class TreeExplainer:
             features = features_list.keys() # TODO to maja byc features dla calego datasetu globalne
             # print(features)
             # features to tablice intow, features[i] mowi na podst. jakiego featura dzieli probki wezel i w drzewie
-            self.tree_banz(self.trees, X, features, betas, deltas, deltas_star, H, B)
+            self.tree_banz(self.trees, features, X, betas, deltas, deltas_star, H, B)
 
             return betas
             # if n_outputs == 1:

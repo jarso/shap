@@ -579,8 +579,20 @@ def tree_banz_recursive(children_left, children_right, children_default, feature
     pass
 
 
-def traverse(node, tree, features, X, betas, deltas, H, B):
-    pass
+def traverse(node, parent, tree, features, X, betas, deltas, H, B, r=[]):
+    if parent.feature in features: # TODO ?? node.feature?
+        present = True
+        b = 2 / (1 + deltas[parent.feature]) * betas[parent]
+    else:
+        present = False
+        features.append(parent.feature)
+        b = betas[parent]
+
+    delta_old = deltas[parent.feature]
+    if node in parent.children_left:
+        deltas[parent.feature] *= (int(x_y < t_{parent}) * r[node] / r[parent] ) #TODO to sa pstwa pojscia do wierzcholka - policzyc wczesniej!
+    #else:
+
 
 def fast(node, tree, features, X, betas, deltas, H, B):
     pass

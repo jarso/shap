@@ -250,31 +250,32 @@ class TreeExplainer:
         assert str(type(X)).endswith("'numpy.ndarray'>"), "Unknown instance type: " + str(type(X))
         assert len(X.shape) == 1 or len(X.shape) == 2, "Instance must have 1 or 2 dimensions!"
 
-        n_outputs = self.trees[0].values.shape[1]
-
         print("uzywajac pythonowego banzhafa")
+
+        n_outputs = self.trees[0].values.shape[1]
+        betas = np.zeros(X.shape[0] + 1, dtype=np.int32)
+        deltas = np.zeros(X.shape[0] + 1, dtype=np.int32)
+        deltas_star = np.zeros(X.shape[0] + 1, dtype=np.int32)
+        B = np.zeros(X.shape[0] + 1, dtype=np.int32)
+
+        H = []
+        for i in range(X.shape[0] + 1):
+            H.append(stack())
+
+        x_missing = []  # np.zeros(X.shape[0], dtype=np.bool)
+
+        features_list = {}
+        for t in self.trees:
+            for i in t.features:
+                features_list[i] = True
+        print("features_list:", features_list)
+
+        features = list(features_list.keys()) # TODO to maja byc features dla calego datasetu globalne
+
         # single instance
-        if (len(X.shape) == 1) or (len(X.shape) == 2):
-            if len(X.shape) == 2:
-                print("dwa wymiary ale tutaj")
-            betas = np.zeros(X.shape[0] + 1, dtype=np.int32)
-            deltas = np.zeros(X.shape[0] + 1, dtype=np.int32)
-            deltas_star = np.zeros(X.shape[0] + 1, dtype=np.int32)
-            B = np.zeros(X.shape[0] + 1, dtype=np.int32)
+        if len(X.shape) == 1:
+            print("jeden wymiar")
 
-            H = []
-            for i in range(X.shape[0] + 1):
-                H.append(stack())
-
-            x_missing = [] # np.zeros(X.shape[0], dtype=np.bool)
-
-            features_list = {}
-            for t in self.trees:
-                for i in t.features:
-                    features_list[i] = True
-            print("features_list:", features_list)
-
-            features = features_list.keys() # TODO to maja byc features dla calego datasetu globalne
             # print(features)
             # features to tablice intow, features[i] mowi na podst. jakiego featura dzieli probki wezel i w drzewie
             self.tree_banz(self.trees, features, X, betas, deltas, deltas_star, H, B)
@@ -287,11 +288,10 @@ class TreeExplainer:
 
         elif len(X.shape) == 2:
             print("dwa wymiary")
-            return []
         #     phi = np.zeros((X.shape[0], X.shape[1] + 1, n_outputs))
         #     x_missing = np.zeros(X.shape[1], dtype=np.bool)
-        #     for i in range(X.shape[0]):
-        #         for t in self.trees:
+            for i in range(X.shape[0]):
+                self.tree_banz(self.trees, features, X[i,:], betas, deltas, deltas_star, H, B)
         #             self.tree_shap(t, X[i,:], x_missing, phi[i,:,:])
         #     phi /= len(self.trees)
         #
@@ -299,6 +299,7 @@ class TreeExplainer:
         #         return phi[:, :, 0]
         #     else:
         #         return [phi[:, :, i] for i in range(n_outputs)]
+            return []
 
     def shap_interaction_values(self, X, tree_limit=-1, **kwargs):
 
@@ -329,21 +330,29 @@ class TreeExplainer:
             1, 1, -1, condition, condition_feature, 1
         )
 
-    def tree_banz(self, trees, features, X, betas, deltas, deltas_star, H, B):
+    def tree_banz(self, trees, features, x, betas, deltas, deltas_star, H, B):
         for i in features:
             betas[i] = 0
             deltas[i] = 0
             H[i] = stack()
         F = []
         for t in trees:
+            proba_list = self.count_node_proba(t)
+
             p = 0 # root ma zawsze id == 0
             for v in [t.children_left[p], t.children_right[p]]:
-                traverse(v, t, features, X, betas, deltas, H, B)
-                fast(v, t, features, X, betas, deltas, H, B)
+                traverse(v, 0, t, features, x, betas, deltas, H, B, proba_list, deltas_star, F)
+                # fast(v, 0, t, features, x, betas, deltas, H, B)
             for v in range(1, len(t.children_right)):
                 diff = 2 * (deltas_star[v] - 1) / (1 + deltas_star[v]) * B[v] # TODO deltas z * sa w algorytmie
                 betas[v] += diff
-        return list(map(lambda x: x / len(trees), betas))
+        return list(map(lambda a: a / len(trees), betas))
+
+    def count_node_proba(self, tree):
+        samples = tree.node_sample_weight
+        to_return = [x / samples[0] for x in samples]
+        # print(to_return)
+        return to_return
 
 class BanzTreeExplainer(TreeExplainer):
     def __str__(self):
@@ -579,20 +588,35 @@ def tree_banz_recursive(children_left, children_right, children_default, feature
     pass
 
 
-def traverse(node, parent, tree, features, X, betas, deltas, H, B, r=[]):
-    if parent.feature in features: # TODO ?? node.feature?
+def traverse(node, parent, tree, features, x, betas, deltas, H, B, r, deltas_star, F):
+    if node == -1:
+        return
+    if features[parent] in F: # TODO ?? node.feature?
         present = True
-        b = 2 / (1 + deltas[parent.feature]) * betas[parent]
+        b = 2 / (1 + deltas[features[parent]]) * betas[parent]
     else:
         present = False
-        features.append(parent.feature)
+        F.append(features[parent])
         b = betas[parent]
 
-    delta_old = deltas[parent.feature]
-    if node in parent.children_left:
-        deltas[parent.feature] *= (int(x_y < t_{parent}) * r[node] / r[parent] ) #TODO to sa pstwa pojscia do wierzcholka - policzyc wczesniej!
-    #else:
+    delta_old = deltas[features[parent]]
+    deltas[features[parent]] *= (r[node] / r[parent]) #TODO to sa pstwa pojscia do wierzcholka - policzyc wczesniej!
+    if node == tree.children_left[parent]:
+        deltas[features[parent]] *= int(x[features[parent]] < tree.thresholds[parent])
+    else:
+        deltas[features[parent]] *= int(x[features[parent]] >= tree.thresholds[parent])
 
+    deltas_star[node] = deltas[features[parent]]
+    b *= (r[node] / r[parent])
+    betas[node] = b * (1 + deltas[features[parent]]) / 2
+
+    for child in [tree.children_left[node], tree.children_right[node]]:
+        traverse(child, node, tree, features, x, betas, deltas, H, B, r, deltas_star, F)
+
+    if not present:
+        F.remove(features[parent])
+
+    deltas[features[parent]] = delta_old
 
 def fast(node, tree, features, X, betas, deltas, H, B):
     pass

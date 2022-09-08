@@ -258,6 +258,7 @@ class TreeExplainer:
         deltas_star = np.zeros(X.shape[0] + 1, dtype=np.float64)
         results = np.zeros(X.shape[0] + 1, dtype=np.float64)
         B = np.zeros(X.shape[0] + 1, dtype=np.float64)
+        S = np.zeros(X.shape[0] + 1, dtype=np.float64)
 
         H = []
         for i in range(X.shape[0] + 1):
@@ -280,7 +281,7 @@ class TreeExplainer:
 
             # print(features)
             # features to tablice intow, features[i] mowi na podst. jakiego featura dzieli probki wezel i w drzewie
-            res = self.tree_banz(self.trees, features, X, betas, deltas, deltas_star, H, B, -1)
+            res = self.tree_banz(self.trees, features, X, betas, deltas, deltas_star, H, B, -1, S)
 
             return betas, res
             # if n_outputs == 1:
@@ -294,7 +295,7 @@ class TreeExplainer:
         #     x_missing = np.zeros(X.shape[1], dtype=np.bool)
             res = []
             for i in range(X.shape[0]):
-                res_part = self.tree_banz(self.trees, features, X[i,:], betas, deltas, deltas_star, H, B, i)
+                res_part = self.tree_banz(self.trees, features, X[i,:], betas, deltas, deltas_star, H, B, i, S)
                 res.append(res_part)
         #             self.tree_shap(t, X[i,:], x_missing, phi[i,:,:])
         #     phi /= len(self.trees)
@@ -334,7 +335,7 @@ class TreeExplainer:
             1, 1, -1, condition, condition_feature, 1
         )
 
-    def tree_banz(self, trees, all_features, x, betas, deltas, deltas_star, H, B, ii):
+    def tree_banz(self, trees, all_features, x, betas, deltas, deltas_star, H, B, ii, S):
         to_return = np.zeros(len(x) + 1, dtype=np.float64)
         for i in all_features: # to nam daje maksimum
             betas[i] = 1.0 #TODO byc moze niepotrzebne
@@ -353,7 +354,7 @@ class TreeExplainer:
             p = 0 # root ma zawsze id == 0
             for v in [t.children_left[p], t.children_right[p]]:
                 traverse(v, 0, t, t.features, x, betas, deltas, H, B, proba_list, deltas_star, F, trees.index(t) == 0)
-                # fast(v, 0, t, features, x, betas, deltas, H, B)
+                fast(v, 0, t, t.features, x, betas, deltas, H, B, S)
 
             # if (not printed) and (ii == 0):
             #     print("sample:")
@@ -665,5 +666,27 @@ def traverse(node, parent, tree, features, x, betas, deltas, H, B, r, deltas_sta
     print2(type(delta_old))
     deltas[features[parent]] = delta_old
 
-def fast(node, tree, features, X, betas, deltas, H, B):
-    pass
+def fast(node, parent, tree, features, x, betas, deltas, H, B, S):
+    H[features[parent]].append(node)
+    if tree.children_left[node] == -1 and tree.children_right[node] == -1:
+       # S[node] = betas[node] * f(node) # TODO ?????? co to jest f
+       S[node] = betas[node]
+    else:
+        fast(tree.children_left[node], node, tree, features, x, betas, deltas, H, B, S)
+        fast(tree.children_right[node], node, tree, features, x, betas, deltas, H, B, S)
+        S[node] = S[tree.children_left[node]] + S[tree.children_right[node]]
+
+    def top(_stack):
+        if len(_stack) > 0:
+            tmp = _stack.pop()
+            _stack.append(tmp)
+            return tmp
+        else:
+            raise Exception("looking at empty stack")
+
+    z = 0
+    while top(H[features[parent]]) != node:
+        z = z + S[H[features[parent]].pop()]
+    B[node] = S[node] - z
+    if len(H[features[parent]]) == 1:
+        H[features[parent]].pop()

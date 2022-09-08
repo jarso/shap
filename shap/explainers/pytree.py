@@ -253,9 +253,10 @@ class TreeExplainer:
         print("uzywajac pythonowego banzhafa")
 
         n_outputs = self.trees[0].values.shape[1]
-        betas = np.zeros(X.shape[0] + 1, dtype=np.float64)
+        betas = np.ones(X.shape[0] + 1, dtype=np.float64)
         deltas = np.ones(X.shape[0] + 1, dtype=np.float64)
         deltas_star = np.zeros(X.shape[0] + 1, dtype=np.float64)
+        results = np.zeros(X.shape[0] + 1, dtype=np.float64)
         B = np.zeros(X.shape[0] + 1, dtype=np.float64)
 
         H = []
@@ -279,9 +280,9 @@ class TreeExplainer:
 
             # print(features)
             # features to tablice intow, features[i] mowi na podst. jakiego featura dzieli probki wezel i w drzewie
-            self.tree_banz(self.trees, features, X, betas, deltas, deltas_star, H, B, -1)
+            res = self.tree_banz(self.trees, features, X, betas, deltas, deltas_star, H, B, -1)
 
-            return betas
+            return betas, res
             # if n_outputs == 1:
             #     return phi[:, 0]
             # else:
@@ -291,8 +292,10 @@ class TreeExplainer:
             print("dwa wymiary")
         #     phi = np.zeros((X.shape[0], X.shape[1] + 1, n_outputs))
         #     x_missing = np.zeros(X.shape[1], dtype=np.bool)
+            res = []
             for i in range(X.shape[0]):
-                self.tree_banz(self.trees, features, X[i,:], betas, deltas, deltas_star, H, B, i)
+                res_part = self.tree_banz(self.trees, features, X[i,:], betas, deltas, deltas_star, H, B, i)
+                res.append(res_part)
         #             self.tree_shap(t, X[i,:], x_missing, phi[i,:,:])
         #     phi /= len(self.trees)
         #
@@ -300,7 +303,7 @@ class TreeExplainer:
         #         return phi[:, :, 0]
         #     else:
         #         return [phi[:, :, i] for i in range(n_outputs)]
-            return betas
+            return betas, res
 
     def shap_interaction_values(self, X, tree_limit=-1, **kwargs):
 
@@ -331,10 +334,11 @@ class TreeExplainer:
             1, 1, -1, condition, condition_feature, 1
         )
 
-    def tree_banz(self, trees, features, x, betas, deltas, deltas_star, H, B, ii):
-        for i in features: # to nam daje maksimum
-            betas[i] = 0.0
-            deltas[i] = 1.0
+    def tree_banz(self, trees, all_features, x, betas, deltas, deltas_star, H, B, ii):
+        to_return = np.zeros(len(x) + 1, dtype=np.float64)
+        for i in all_features: # to nam daje maksimum
+            betas[i] = 1.0 #TODO byc moze niepotrzebne
+            deltas[i] = 1.0 #jw
             H[i] = stack()
         F = []
         printed = False
@@ -348,22 +352,32 @@ class TreeExplainer:
 
             p = 0 # root ma zawsze id == 0
             for v in [t.children_left[p], t.children_right[p]]:
-                traverse(v, 0, t, t.features, x, betas, deltas, H, B, proba_list, deltas_star, F)
+                traverse(v, 0, t, t.features, x, betas, deltas, H, B, proba_list, deltas_star, F, trees.index(t) == 0)
                 # fast(v, 0, t, features, x, betas, deltas, H, B)
 
-            if (not printed) and (ii == 0):
-                print("sample:")
-                print(x)
-                print("deltas:")
-                print(deltas)
-                print("deltas star:")
-                print(deltas_star)
-                printed = True
+            # if (not printed) and (ii == 0):
+            #     print("sample:")
+            #     print(x)
+            #     print("deltas:")
+            #     print(deltas)
+            #     print("deltas star:")
+            #     print(deltas_star)
+            #     printed = True
 
             for v in range(1, len(t.children_right)):
-                diff = 2 * (deltas_star[v] - 1) / (1 + deltas_star[v]) * B[v] # TODO deltas z * sa w algorytmie
-                betas[v] += diff
-        return list(map(lambda a: a / len(trees), betas))
+                to_return[t.features[v]] += 2 * (deltas_star[v] - 1) / (1 + deltas_star[v]) * B[v] # TODO deltas z * sa w algorytmie
+                if (not printed) and (ii == 0) and False:
+                    print("toreturn old:")
+                    print(to_return[t.features[v]])
+
+                    print("deltas star")
+                    print(2 * (deltas_star[v] - 1) / (1 + deltas_star[v]))
+
+                    print("toreturn new:")
+                    print(to_return[t.features[v]])
+                    # printed = True
+
+        return list(map(lambda a: a / len(trees), to_return))
 
     def count_node_proba(self, tree):
         samples = tree.node_sample_weight
@@ -605,21 +619,14 @@ def tree_banz_recursive(children_left, children_right, children_default, feature
     pass
 
 
-def traverse(node, parent, tree, features, x, betas, deltas, H, B, r, deltas_star, F):
+def traverse(node, parent, tree, features, x, betas, deltas, H, B, r, deltas_star, F, should_print):
     def print2(str):
-        if parent == -3:
+        if parent == -9 and should_print:
             print(str)
 
-    if node == -1:
+    if node == -1: # leaf
         return
-    try:
-        features[parent] in F
-    except:
-        print("ERR FEATURES PARENT IN F")
-        print(features)
-        print(parent)
-        print(F)
-        print("ERR END")
+
     if features[parent] in F: # TODO ?? node.feature?
         print2("present")
         present = True
@@ -631,36 +638,24 @@ def traverse(node, parent, tree, features, x, betas, deltas, H, B, r, deltas_sta
         b = betas[parent]
 
     delta_old = deltas[features[parent]]
-    print2(r[node])
-    print2(type(r[node]))
-    print2(r[parent])
-    print2(type(r[parent]))
-    print2(deltas[features[parent]])
-    print2(type(deltas[features[parent]]))
-    print2("typ listy deltas:")
-    print2(type(deltas))
-    print2("nowe:")
     deltas[features[parent]] = deltas[features[parent]] * (r[node] / r[parent]) #TODO to sa pstwa pojscia do wierzcholka - policzyc wczesniej!
-    print2(deltas[features[parent]])
     if node == tree.children_left[parent]:
-        print2("left son")
         deltas[features[parent]] = deltas[features[parent]] * float(x[features[parent]] < tree.thresholds[parent])
     else:
-        print2("right son")
         deltas[features[parent]] = deltas[features[parent]] * float(x[features[parent]] >= tree.thresholds[parent])
 
-    print2("deltas na koniec:")
-    print2(deltas[features[parent]])
-    print2(type(deltas[features[parent]]))
-
     deltas_star[node] = deltas[features[parent]]
-    b *= (r[node] / r[parent])
+    b = b * (r[node] / r[parent])
+    print2("betas:")
+    print2(betas[node])
+    print2(type(betas[node]))
     betas[node] = b * (1 + deltas[features[parent]]) / 2
+    print2(type(betas[node]))
 
     for child in [tree.children_left[node], tree.children_right[node]]:
         print2("child:")
         print2(child)
-        traverse(child, node, tree, features, x, betas, deltas, H, B, r, deltas_star, F)
+        traverse(child, node, tree, features, x, betas, deltas, H, B, r, deltas_star, F, False)
 
     if not present:
         F.remove(features[parent])

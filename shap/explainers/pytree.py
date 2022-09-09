@@ -142,7 +142,7 @@ class TreeExplainer:
 
     def __init__(self, model, **kwargs):
         self.model_type = "internal"
-        print("nowy treexplainer")
+        # print("nowy treexplainer")
 
         if str(type(model)).endswith("sklearn.ensemble._forest.RandomForestRegressor'>"):
             self.trees = [Tree(e.tree_) for e in model.estimators_]
@@ -270,7 +270,7 @@ class TreeExplainer:
         for t in self.trees:
             for i in t.features:
                 features_list[i] = True
-        print("features_list:", features_list)
+        # print("features_list:", features_list)
 
         features = list(features_list.keys()) # TODO to maja byc features dla calego datasetu globalne
         features.remove(-2) # -2 to dummy feature dla lisci
@@ -304,7 +304,7 @@ class TreeExplainer:
         #         return phi[:, :, 0]
         #     else:
         #         return [phi[:, :, i] for i in range(n_outputs)]
-            return betas, res
+            return res
 
     def shap_interaction_values(self, X, tree_limit=-1, **kwargs):
 
@@ -670,7 +670,7 @@ def fast(node, parent, tree, features, x, betas, deltas, H, B, S):
     H[features[parent]].append(node)
     if tree.children_left[node] == -1 and tree.children_right[node] == -1:
        # S[node] = betas[node] * f(node) # TODO ?????? co to jest f
-       S[node] = betas[node]
+       S[node] = betas[node] * tree.values[node] # nie do konca wiem co jest w tablicy tree.values
     else:
         fast(tree.children_left[node], node, tree, features, x, betas, deltas, H, B, S)
         fast(tree.children_right[node], node, tree, features, x, betas, deltas, H, B, S)

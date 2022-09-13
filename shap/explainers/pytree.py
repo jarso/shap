@@ -5,6 +5,8 @@ module which uses a compiled C++ implementation.
 """
 import numpy as np
 from collections import deque as stack
+from functools import reduce
+from itertools import chain, combinations
 #import numba
 # from .explainer import Explainer
 
@@ -281,7 +283,7 @@ class TreeExplainer:
 
             # print(features)
             # features to tablice intow, features[i] mowi na podst. jakiego featura dzieli probki wezel i w drzewie
-            res = self.tree_banz(self.trees, features, X, betas, deltas, deltas_star, H, B, -1, S)
+            res = self.tree_banz(self.trees, features, X, betas, deltas, deltas_star, H, B, 0, S)
 
             return betas, res
             # if n_outputs == 1:
@@ -320,7 +322,7 @@ class TreeExplainer:
             raise Exception("Interaction values not yet supported for model type: " + str(type(X)))
 
     def tree_shap(self, tree, x, x_missing, phi, condition=0, condition_feature=0):
-        print("oryginalna implementacja")
+        # print("oryginalna implementacja")
 
         # update the bias term, which is the last index in phi
         # (note the paper has this as phi_0 instead of phi_M)
@@ -335,7 +337,47 @@ class TreeExplainer:
             1, 1, -1, condition, condition_feature, 1
         )
 
+    def brute_shap_coalition_value(self, x, _S):
+        def desc(_set, v, tree):
+            if tree.features[v] == -2:  # is a leaf
+                return tree.values[v]
+            else:
+                if tree.features[v] in _S:
+                    if x[tree.features[v]] < tree.thresholds[v]:
+                        return desc(_S, tree.children_left[v], tree)
+                    else:
+                        return desc(_S, tree.children_right[v], tree)
+                else:
+                    r = [_x / tree.node_sample_weight[0] for _x in tree.node_sample_weight]
+                    return (r[tree.children_left[v]] * desc(_S, tree.children_left[v], tree) +
+                            r[tree.children_right[v]] * desc(_S, tree.children_right[v], tree)) / r[v]
+
+        #return reduce(lambda a, b: a + b, [desc(_S, 0, i) for i in [self.trees[0]]])
+        return (reduce(lambda a, b: a + b, [desc(_S, 0, i) for i in self.trees])) / len(self.trees)
+
+    def brute_shap(self, x, i):
+
+        def powerset(iterable):
+            print(iterable)
+            _s = list(iterable)
+            _l = list(chain.from_iterable(combinations(_s, _r) for _r in range(len(_s) + 1)))
+            return [list(_a) for _a in _l]
+        def product(iterable):
+            return reduce(lambda a, b: a * b, iterable, 1)
+
+        to_return = 0
+        n = len(x)
+        p = [_a for _a in list(range(n)) if _a != i]
+        for _S in powerset(p):
+            _tmp = (product(range(1, n - len(_S))) / product(range(len(_S) + 1, n)))
+            _tmp *= (self.brute_shap_coalition_value(x, _S + [i]) - self.brute_shap_coalition_value(x, _S))
+            to_return += _tmp
+
+        return to_return / len(x)
+
     def tree_banz(self, trees, all_features, x, betas, deltas, deltas_star, H, B, ii, S):
+        print("probka:")
+        print(x)
         to_return = np.zeros(len(x) + 1, dtype=np.float64)
         for i in all_features: # to nam daje maksimum
             betas[i] = 1.0 #TODO byc moze niepotrzebne
@@ -356,28 +398,36 @@ class TreeExplainer:
                 traverse(v, 0, t, t.features, x, betas, deltas, H, B, proba_list, deltas_star, F, trees.index(t) == 0)
                 fast(v, 0, t, t.features, x, betas, deltas, H, B, S)
 
-            # if (not printed) and (ii == 0):
-            #     print("sample:")
-            #     print(x)
-            #     print("deltas:")
-            #     print(deltas)
-            #     print("deltas star:")
-            #     print(deltas_star)
-            #     printed = True
-
             for v in range(1, len(t.children_right)):
-                to_return[t.features[v]] += 2 * (deltas_star[v] - 1) / (1 + deltas_star[v]) * B[v] # TODO deltas z * sa w algorytmie
-                if (not printed) and (ii == 0) and False:
-                    print("toreturn old:")
-                    print(to_return[t.features[v]])
+                if t.features[v] != -2:
+                    to_return[t.features[v]] += 2 * (deltas_star[v] - 1) / (1 + deltas_star[v]) * B[v] # TODO deltas z * sa w algorytmie
 
-                    print("deltas star")
-                    print(2 * (deltas_star[v] - 1) / (1 + deltas_star[v]))
+                    if (not printed) and (ii == 0):
+                        print("betas:")
+                        print(betas)
 
-                    print("toreturn new:")
-                    print(to_return[t.features[v]])
-                    # printed = True
+                        print("deltas_star:")
+                        print(deltas_star)
 
+
+                        print("dla v = {}".format(v))
+                        print("cecha to: > {} <".format(t.features[v]))
+
+
+                        print("toreturn old:")
+                        print(to_return[t.features[v]])
+
+                        print("deltas star")
+                        print(2 * (deltas_star[v] - 1) / (1 + deltas_star[v]))
+
+                        print("B[v]")
+                        print(B[v])
+
+                        print("toreturn new:")
+                        print(to_return[t.features[v]])
+
+        print("toReturn[] cala:")
+        print(to_return)
         return list(map(lambda a: a / len(trees), to_return))
 
     def count_node_proba(self, tree):
@@ -666,16 +716,8 @@ def traverse(node, parent, tree, features, x, betas, deltas, H, B, r, deltas_sta
     print2(type(delta_old))
     deltas[features[parent]] = delta_old
 
-def fast(node, parent, tree, features, x, betas, deltas, H, B, S):
-    H[features[parent]].append(node)
-    if tree.children_left[node] == -1 and tree.children_right[node] == -1:
-       # S[node] = betas[node] * f(node) # TODO ?????? co to jest f
-       S[node] = betas[node] * tree.values[node] # nie do konca wiem co jest w tablicy tree.values
-    else:
-        fast(tree.children_left[node], node, tree, features, x, betas, deltas, H, B, S)
-        fast(tree.children_right[node], node, tree, features, x, betas, deltas, H, B, S)
-        S[node] = S[tree.children_left[node]] + S[tree.children_right[node]]
 
+def fast(node, parent, tree, features, x, betas, deltas, H, B, S):
     def top(_stack):
         if len(_stack) > 0:
             tmp = _stack.pop()
@@ -684,9 +726,27 @@ def fast(node, parent, tree, features, x, betas, deltas, H, B, S):
         else:
             raise Exception("looking at empty stack")
 
+    H[features[parent]].append(node)
+    if tree.children_left[node] == -1 and tree.children_right[node] == -1:
+        # S[node] = betas[node] * f(node) # TODO ?????? co to jest f
+        S[node] = betas[node] * tree.values[node] # nie do konca wiem co jest w tablicy tree.values
+    else:
+        fast(tree.children_left[node], node, tree, features, x, betas, deltas, H, B, S)
+        fast(tree.children_right[node], node, tree, features, x, betas, deltas, H, B, S)
+        S[node] = S[tree.children_left[node]] + S[tree.children_right[node]]
+
     z = 0
     while top(H[features[parent]]) != node:
         z = z + S[H[features[parent]].pop()]
+    # print("B[node] stary i nowy:")
+    # print(B[node])
     B[node] = S[node] - z
+    if node == 1:
+        # print("S[node] = {}".format(S[node]))
+        # print("z = {}".format(z))
+        if B[node] == 0:
+            print("B to ZERO dla:")
+            print([S[node], z])
+    # print(B[node])
     if len(H[features[parent]]) == 1:
         H[features[parent]].pop()

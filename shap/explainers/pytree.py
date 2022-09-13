@@ -138,6 +138,16 @@ from itertools import chain, combinations
 #             )
 
 
+def product(iterable):
+    return reduce(lambda a, b: a * b, iterable, 1)
+
+
+def powerset(iterable):
+    _s = list(iterable)
+    _l = list(chain.from_iterable(combinations(_s, _r) for _r in range(len(_s) + 1)))
+    return [list(_a) for _a in _l]
+
+
 class TreeExplainer:
     """ A pure Python (slow) implementation of Tree SHAP.
     """
@@ -337,7 +347,7 @@ class TreeExplainer:
             1, 1, -1, condition, condition_feature, 1
         )
 
-    def brute_shap_coalition_value(self, x, _S):
+    def coalition_value(self, x, _S):
         def desc(_set, v, tree):
             if tree.features[v] == -2:  # is a leaf
                 return tree.values[v]
@@ -352,28 +362,29 @@ class TreeExplainer:
                     return (r[tree.children_left[v]] * desc(_S, tree.children_left[v], tree) +
                             r[tree.children_right[v]] * desc(_S, tree.children_right[v], tree)) / r[v]
 
-        #return reduce(lambda a, b: a + b, [desc(_S, 0, i) for i in [self.trees[0]]])
         return (reduce(lambda a, b: a + b, [desc(_S, 0, i) for i in self.trees])) / len(self.trees)
 
     def brute_shap(self, x, i):
-
-        def powerset(iterable):
-            print(iterable)
-            _s = list(iterable)
-            _l = list(chain.from_iterable(combinations(_s, _r) for _r in range(len(_s) + 1)))
-            return [list(_a) for _a in _l]
-        def product(iterable):
-            return reduce(lambda a, b: a * b, iterable, 1)
-
         to_return = 0
         n = len(x)
         p = [_a for _a in list(range(n)) if _a != i]
         for _S in powerset(p):
             _tmp = (product(range(1, n - len(_S))) / product(range(len(_S) + 1, n)))
-            _tmp *= (self.brute_shap_coalition_value(x, _S + [i]) - self.brute_shap_coalition_value(x, _S))
+            _tmp *= (self.coalition_value(x, _S + [i]) - self.coalition_value(x, _S))
             to_return += _tmp
 
         return to_return / len(x)
+
+    def brute_banz(self, x, i):  #TODO uogolnic obie metody
+        to_return = 0
+        n = len(x)
+        p = [_a for _a in list(range(n)) if _a != i]
+        for _S in powerset(p):
+            # _tmp = (product(range(1, n - len(_S))) / product(range(len(_S) + 1, n)))
+            _tmp = (self.coalition_value(x, _S + [i]) - self.coalition_value(x, _S))
+            to_return += _tmp
+
+        return to_return / 2 ** (n - 1)
 
     def tree_banz(self, trees, all_features, x, betas, deltas, deltas_star, H, B, ii, S):
         print("probka:")

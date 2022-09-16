@@ -197,43 +197,6 @@ inline tfloat *tree_predict(unsigned i, const TreeEnsemble &trees, const tfloat 
     }
 }
 
-inline void dense_tree_predict(tfloat *out, const TreeEnsemble &trees, const ExplanationDataset &data, unsigned model_transform) {
-    tfloat *row_out = out;
-    const tfloat *x = data.X;
-    const bool *x_missing = data.X_missing;
-
-    // see what transform (if any) we have
-    transform_f transform = get_transform(model_transform);
-
-    for (unsigned i = 0; i < data.num_X; ++i) {
-
-        // add the base offset
-        for (unsigned k = 0; k < trees.num_outputs; ++k) {
-            row_out[k] += trees.base_offset[k];
-        }
-
-        // add the leaf values from each tree
-        for (unsigned j = 0; j < trees.tree_limit; ++j) {
-            const tfloat *leaf_value = tree_predict(j, trees, x, x_missing);
-
-            for (unsigned k = 0; k < trees.num_outputs; ++k) {
-                row_out[k] += leaf_value[k];
-            }
-        }
-
-        // apply any needed transform
-        if (transform != NULL) {
-            const tfloat y_i = data.y == NULL ? 0 : data.y[i];
-            for (unsigned k = 0; k < trees.num_outputs; ++k) {
-                row_out[k] = transform(row_out[k], y_i);
-            }
-        }
-
-        x += data.M;
-        x_missing += data.M;
-        row_out += trees.num_outputs;
-    }
-}
 
 inline void tree_update_weights(unsigned i, TreeEnsemble &trees, const tfloat *x, const bool *x_missing) {
     const unsigned offset = i * trees.max_nodes;
@@ -1434,7 +1397,6 @@ inline void dense_global_path_dependent(const TreeEnsemble& trees, const Explana
  */
 inline void dense_tree_shap(const TreeEnsemble& trees, const ExplanationDataset &data, tfloat *out_contribs,
                      const int feature_dependence, unsigned model_transform, bool interactions) {
-
     // see what transform (if any) we have
     transform_f transform = get_transform(model_transform);
 

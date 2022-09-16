@@ -390,7 +390,7 @@ class Tree(Explainer):
         print("using treeshap and cext")
         phi = np.zeros((X.shape[0], X.shape[1]+1, self.model.num_outputs))
         if not approximate:
-            _cext.dense_tree_shap(
+            _cext.dense_tree_banz(
                 self.model.children_left, self.model.children_right, self.model.children_default,
                 self.model.features, self.model.thresholds, self.model.values, self.model.node_sample_weight,
                 self.model.max_depth, X, X_missing, y, self.data, self.data_missing, tree_limit,
@@ -1108,6 +1108,7 @@ class TreeEnsemble:
         transform = self.get_transform()
         assert_import("cext")
         output = np.zeros((X.shape[0], self.num_outputs))
+        print("using dense_Tree_pred")
         _cext.dense_tree_predict(
             self.children_left, self.children_right, self.children_default,
             self.features, self.thresholds, self.values,

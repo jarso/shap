@@ -707,6 +707,7 @@ def traverse(node, parent, tree, features, x, betas, deltas, H, B, r, deltas_sta
         deltas[features[parent]] = deltas[features[parent]] * float(x[features[parent]] >= tree.thresholds[parent])
 
     deltas_star[node] = deltas[features[parent]]
+    print("ustawiam delta_star od {} na {}".format(node, deltas[features[parent]]))
     b = b * (r[node] / r[parent])
     print2("betas:")
     print2(betas[node])
@@ -739,7 +740,6 @@ def fast(node, parent, tree, features, x, betas, deltas, H, B, S):
 
     H[features[parent]].append(node)
     if tree.children_left[node] == -1 and tree.children_right[node] == -1:
-        # S[node] = betas[node] * f(node) # TODO ?????? co to jest f
         S[node] = betas[node] * tree.values[node] # nie do konca wiem co jest w tablicy tree.values
     else:
         fast(tree.children_left[node], node, tree, features, x, betas, deltas, H, B, S)

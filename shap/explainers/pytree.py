@@ -291,11 +291,10 @@ class TreeExplainer:
         if len(X.shape) == 1:
             print("jeden wymiar")
 
-            # print(features)
             # features to tablice intow, features[i] mowi na podst. jakiego featura dzieli probki wezel i w drzewie
             res = self.tree_banz(self.trees, features, X, betas, deltas, deltas_star, H, B, 0, S)
 
-            return betas, res
+            return res
             # if n_outputs == 1:
             #     return phi[:, 0]
             # else:
@@ -303,15 +302,12 @@ class TreeExplainer:
 
         elif len(X.shape) == 2:
             print("dwa wymiary")
-        #     phi = np.zeros((X.shape[0], X.shape[1] + 1, n_outputs))
-        #     x_missing = np.zeros(X.shape[1], dtype=np.bool)
+
             res = []
             for i in range(X.shape[0]):
                 res_part = self.tree_banz(self.trees, features, X[i,:], betas, deltas, deltas_star, H, B, i, S)
                 res.append(res_part)
-        #             self.tree_shap(t, X[i,:], x_missing, phi[i,:,:])
-        #     phi /= len(self.trees)
-        #
+
         #     if n_outputs == 1:
         #         return phi[:, :, 0]
         #     else:
@@ -387,18 +383,16 @@ class TreeExplainer:
         return to_return / 2 ** (n - 1)
 
     def tree_banz(self, trees, all_features, x, betas, deltas, deltas_star, H, B, ii, S):
-        def _get_parent(node, tree):  #TODO wywalic - za wolne!
-            index_left = np.where(tree.children_left == node)
-            index_right = np.where(tree.children_right == node)
-            i_left, = index_left
-            i_right, = index_right
-            index_sum = []
-            index_sum.extend(i_left)
-            index_sum.extend(i_right)
-            return index_sum[0]
+        def _get_parents(tree):
+            parents_list = [None] * len(tree.children_right)
+            for j in range(len(tree.children_right)):
+                if tree.children_right[j] != -1:
+                    parents_list[tree.children_right[j]] = j
+                if tree.children_left[j] != -1:
+                    parents_list[tree.children_left[j]] = j
 
-        # print("probka:")
-        # print(x)
+            return parents_list
+
         to_return = np.zeros(len(x), dtype=np.float64)
         for i in all_features: # to nam daje maksimum
             betas[i] = 1.0 #TODO byc moze niepotrzebne
@@ -406,14 +400,8 @@ class TreeExplainer:
             H[i] = stack()
             # TODO wyzerowac inne!
         F = []
-        printed = False
-        trees = [trees[1]]  #TODO WYWALIC!!!!
         for t in trees:
-            if (not printed) and (ii == 0):
-                print("tree:")
-                from pprint import pprint
-                pprint(vars(t))
-
+            parents = _get_parents(t)
             proba_list = self.count_node_proba(t)
 
             p = 0 # root ma zawsze id == 0
@@ -422,35 +410,9 @@ class TreeExplainer:
                 fast(v, 0, t, t.features, x, betas, deltas, H, B, S)
 
             for v in range(1, len(t.children_right)):
-                parent = _get_parent(v, t)
+                parent = parents[v]
                 to_return[t.features[parent]] += 2 * (deltas_star[v] - 1) / (1 + deltas_star[v]) * B[v] # TODO deltas z * sa w algorytmie
 
-                if (not printed) and (ii == 0):
-                        print("betas:")
-                        print(betas)
-
-                        print("deltas_star:")
-                        print(deltas_star)
-
-
-                        print("dla v = {}".format(v))
-                        print("cecha to: > {} <".format(t.features[v]))
-
-
-                        print("toreturn old:")
-                        print(to_return[t.features[v]])
-
-                        print("deltas star")
-                        print(2 * (deltas_star[v] - 1) / (1 + deltas_star[v]))
-
-                        print("B[v]")
-                        print(B[v])
-
-                        print("toreturn new:")
-                        print(to_return[t.features[v]])
-
-        # print("toReturn[] cala:")
-        # print(to_return)
         return list(map(lambda a: a / len(trees), to_return))
 
     def count_node_proba(self, tree):
@@ -712,7 +674,7 @@ def traverse(node, parent, tree, features, x, betas, deltas, H, B, r, deltas_sta
         b = betas[parent]
 
     delta_old = deltas[features[parent]]
-    deltas[features[parent]] = deltas[features[parent]] * (r[node] / r[parent]) #TODO to sa pstwa pojscia do wierzcholka - policzyc wczesniej!
+    deltas[features[parent]] = deltas[features[parent]] * (r[parent] / r[node]) #TODO to sa pstwa pojscia do wierzcholka - policzyc wczesniej!
     if node == tree.children_left[parent]:
         deltas[features[parent]] = deltas[features[parent]] * float(x[features[parent]] < tree.thresholds[parent])
     else:
@@ -721,10 +683,9 @@ def traverse(node, parent, tree, features, x, betas, deltas, H, B, r, deltas_sta
     deltas_star[node] = deltas[features[parent]]
     # print("ustawiam delta_star od {} na {}".format(node, deltas[features[parent]]))
     b = b * (r[node] / r[parent])
+    betas[node] = b * (1 + deltas[features[parent]]) / 2
     print2("betas:")
     print2(betas[node])
-    print2(type(betas[node]))
-    betas[node] = b * (1 + deltas[features[parent]]) / 2
     print2(type(betas[node]))
 
     for child in [tree.children_left[node], tree.children_right[node]]:

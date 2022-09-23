@@ -116,6 +116,7 @@ static PyObject *_cext_compute_expectations(PyObject *self, PyObject *args)
 
 static PyObject *_cext_dense_tree_shap(PyObject *self, PyObject *args)
 {
+    COUT("dense tree shap")
     PyObject *children_left_obj;
     PyObject *children_right_obj;
     PyObject *children_default_obj;
@@ -256,13 +257,13 @@ inline void proper_tree_banz(const TreeEnsemble& trees, const ExplanationDataset
 
 inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset &data, tfloat *out_contribs,
                      const int feature_dependence, unsigned model_transform, bool interactions) {
-    COUT("using dense tree banz")
     proper_tree_banz(trees, data);
     return;
 }
 
 static PyObject *_cext_dense_tree_banz(PyObject *self, PyObject *args)
 {
+    COUT("dense tree banz")
     PyObject *children_left_obj;
     PyObject *children_right_obj;
     PyObject *children_default_obj;

@@ -278,7 +278,7 @@ class Tree(Explainer):
         return X, y, X_missing, flat_output, tree_limit, check_additivity
 
 
-    def shap_values(self, X, y=None, tree_limit=None, approximate=False, check_additivity=True, from_call=False):
+    def shap_values(self, X, y=None, tree_limit=None, approximate=False, check_additivity=True, from_call=False, banz=False):
         """ Estimate the SHAP values for a set of samples.
 
         Parameters
@@ -389,8 +389,13 @@ class Tree(Explainer):
         assert_import("cext")
         print("using treeshap and cext")
         phi = np.zeros((X.shape[0], X.shape[1]+1, self.model.num_outputs))
+        if banz:
+            _func = _cext.dense_tree_banz
+        else:
+            _func = _cext.dense_tree_shap
+
         if not approximate:
-            _cext.dense_tree_banz(
+            _func(
                 self.model.children_left, self.model.children_right, self.model.children_default,
                 self.model.features, self.model.thresholds, self.model.values, self.model.node_sample_weight,
                 self.model.max_depth, X, X_missing, y, self.data, self.data_missing, tree_limit,

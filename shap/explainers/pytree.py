@@ -264,11 +264,9 @@ class TreeExplainer:
 
         print("uzywajac pythonowego banzhafa")
 
-        n_outputs = self.trees[0].values.shape[1]
-        betas = np.ones(X.shape[0] + 1, dtype=np.float64)
+        betas = np.ones(X.shape[0] + 1, dtype=np.float64) #TODO te rozmiary
         deltas = np.ones(X.shape[0] + 1, dtype=np.float64)
         deltas_star = np.zeros(X.shape[0] + 1, dtype=np.float64)
-        results = np.zeros(X.shape[0] + 1, dtype=np.float64)
         B = np.zeros(X.shape[0] + 1, dtype=np.float64)
         S = np.zeros(X.shape[0] + 1, dtype=np.float64)
 
@@ -282,7 +280,6 @@ class TreeExplainer:
         for t in self.trees:
             for i in t.features:
                 features_list[i] = True
-        # print("features_list:", features_list)
 
         features = list(features_list.keys()) # TODO to maja byc features dla calego datasetu globalne
         features.remove(-2) # -2 to dummy feature dla lisci
@@ -299,9 +296,10 @@ class TreeExplainer:
             #     return phi[:, 0]
             # else:
             #     return [phi[:, i] for i in range(n_outputs)]
-
         elif len(X.shape) == 2:
             print("dwa wymiary")
+
+            return self.tree_banz(self.trees, features, X, betas, deltas, deltas_star, H, B, i, S)
 
             res = []
             for i in range(X.shape[0]):
@@ -328,8 +326,6 @@ class TreeExplainer:
             raise Exception("Interaction values not yet supported for model type: " + str(type(X)))
 
     def tree_shap(self, tree, x, x_missing, phi, condition=0, condition_feature=0):
-        # print("oryginalna implementacja")
-
         # update the bias term, which is the last index in phi
         # (note the paper has this as phi_0 instead of phi_M)
         if condition == 0:
@@ -418,30 +414,7 @@ class TreeExplainer:
     def count_node_proba(self, tree):
         samples = tree.node_sample_weight
         to_return = [x / samples[0] for x in samples]
-        # print(to_return)
         return to_return
-
-class BanzTreeExplainer(TreeExplainer):
-    def __str__(self):
-        return "banzhaf"
-
-    def tree_shap(self, tree, x, x_missing, phi, condition=0, condition_feature=0):
-        print("moja implementacja")
-
-        # update the bias term, which is the last index in phi
-        # (note the paper has this as phi_0 instead of phi_M)
-        if condition == 0:
-            phi[-1,:] += tree.values[0,:]
-
-        # start the recursive algorithm
-        tree_shap_recursive(
-            tree.children_left, tree.children_right, tree.children_default, tree.features,
-            tree.thresholds, tree.values, tree.node_sample_weight,
-            x, x_missing, phi, 0, 0, self.feature_indexes, self.zero_fractions, self.one_fractions, self.pweights,
-            1, 1, -1, condition, condition_feature, 1
-        )
-
-
 
 
 # extend our decision path with a fraction of one and zero extensions

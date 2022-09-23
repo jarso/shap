@@ -4,6 +4,8 @@
 #include <numpy/arrayobject.h>
 #include "tree_shap.h"
 #include <iostream>
+#include <stack>
+#include <set>
 
 #define COUT(x) std::cout << x << std::endl;
 
@@ -251,13 +253,56 @@ static PyObject *_cext_dense_tree_shap(PyObject *self, PyObject *args)
 
 
 
-inline void proper_tree_banz(const TreeEnsemble& trees, const ExplanationDataset &data) {
+inline void proper_tree_banz(const TreeEnsemble& trees, const ExplanationDataset &data, tfloat *out_contribs) {
     return;
 }
 
 inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset &data, tfloat *out_contribs,
                      const int feature_dependence, unsigned model_transform, bool interactions) {
-    proper_tree_banz(trees, data);
+
+    // initializing values
+    // TODO why double and not float / tfloat ???
+    int features_count = trees.max_nodes;
+    double* feature_results = new double[features_count]; // todo liczba cech
+    double* betas = new double[trees.max_nodes];
+    double* deltas = new double[features_count]; // todo liczba cech
+    double* deltas_star = new double[trees.max_nodes];
+    double* B = new double[trees.max_nodes];
+    double* S = new double[trees.max_nodes];
+
+    std::set<int>* F = new std::set<int>;
+
+    std::stack<int>** H = new std::stack<int>*[features_count]; // todo liczba cech
+
+    for (unsigned i = 0; i < features_count; ++i) {
+        H[i] = new std::stack<int>;
+        deltas[i] = 1;
+        feature_result[i] = 0;
+    }
+    
+    for (unsigned i = 0; i < trees.max_nodes; ++i) {
+        deltas_star[i] = 0;
+        betas[i] = 1;
+        B[i] = 0;
+        S[i] = 0;
+        feature_results[i] = 0;
+    }
+
+    // proper calculations
+    for (unsigned i = 0; i < trees.tree_limit; ++i) {
+        TreeEnsemble tree;
+        trees.get_tree(tree, i);
+        unsigned root = 0; // ?? czy na pewno?
+        traverse(tree.children_left[root]);
+        fast(tree.children_left[root]);
+        traverse(tree.children_right[root]);
+        fast(tree.children_right[root]);
+        int number_of_nodes = trees.max_nodes;
+        for (unsigned v = 1; v < number_of_nodes; ++v) {
+            feature_results[features[v]] += 2 * B[v] * () / ();
+        }
+    }
+
     return;
 }
 

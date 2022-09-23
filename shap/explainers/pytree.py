@@ -297,9 +297,7 @@ class TreeExplainer:
             # else:
             #     return [phi[:, i] for i in range(n_outputs)]
         elif len(X.shape) == 2:
-            print("dwa wymiary")
-
-            return self.tree_banz(self.trees, features, X, betas, deltas, deltas_star, H, B, i, S)
+            print("dwa wymiary")    # TODO NIE DZIALA FORMAT DANYCH
 
             res = []
             for i in range(X.shape[0]):

@@ -391,7 +391,12 @@ inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset 
         traverse(tree.children_right[root], data.X, TAIL);
         fast(tree.children_right[root], TAIL);
 
-        //std::cout << "betas for :" <<  << "\n";
+
+        std::cout << "betas for :" << "\n";
+        for (unsigned i = 0; i < trees.max_nodes; ++i)
+            std::cout << betas[i] << std::endl;
+
+        std::cout << "probka: [ " << data.X[0] << ", " << data.X[1] << ", ... ]" << std::endl;
         for (int ii = 0; ii < trees.max_nodes; ii++)
             std::cout << ii << " :: " << betas[ii] << std::endl;
 

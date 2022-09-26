@@ -263,6 +263,8 @@ class TreeExplainer:
         assert str(type(X)).endswith("'numpy.ndarray'>"), "Unknown instance type: " + str(type(X))
         assert len(X.shape) == 1 or len(X.shape) == 2, "Instance must have 1 or 2 dimensions!"
 
+        self.trees = [ self.trees[0] ] # TODO USUNAC!!!!!!!!!!!!!!
+
         print("uzywajac pythonowego banzhafa")
         from pprint import pprint
         pprint(vars(self.trees[0]))
@@ -398,6 +400,7 @@ class TreeExplainer:
             H[i] = stack()
             # TODO wyzerowac inne!
         F = []
+        print("ile drzew? {}".format(len(trees)))
         for t in trees:
             parents = _get_parents(t)
             proba_list = self.count_node_proba(t)
@@ -658,6 +661,7 @@ def traverse(node, parent, tree, features, x, betas, deltas, H, B, r, deltas_sta
     else:
         deltas[features[parent]] = deltas[features[parent]] * float(x[features[parent]] >= tree.thresholds[parent])
 
+    print2("deltas here: {}".format(deltas[features[parent]]))
     deltas_star[node] = deltas[features[parent]]
     # print("ustawiam delta_star od {} na {}".format(node, deltas[features[parent]]))
     b = b * (r[node] / r[parent])

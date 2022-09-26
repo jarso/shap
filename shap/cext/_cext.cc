@@ -391,6 +391,10 @@ inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset 
         traverse(tree.children_right[root], data.X, TAIL);
         fast(tree.children_right[root], TAIL);
 
+        COUT("rozmiary:")
+        COUT(data.M) // !! rozmiar probki
+        COUT(data.num_X) // !! liczba probek
+        COUT("koniec rozmiarow")
 
         std::cout << "betas for :" << "\n";
         for (unsigned i = 0; i < trees.max_nodes; ++i)

@@ -993,6 +993,10 @@ class TreeEnsemble:
             raise Exception("Model type not yet supported by TreeExplainer: " + str(type(model)))
 
         # build a dense numpy version of all the tree objects
+        self.trees = [ self.trees[0] ] #  TODO wywalic!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        from pprint import pprint
+        pprint(vars(self.trees[0]))
+
         if self.trees is not None and self.trees:
             max_nodes = np.max([len(t.values) for t in self.trees])
             assert len(np.unique([t.values.shape[1] for t in self.trees])) == 1, "All trees in the ensemble must have the same output dimension!"
@@ -1113,7 +1117,12 @@ class TreeEnsemble:
         transform = self.get_transform()
         assert_import("cext")
         output = np.zeros((X.shape[0], self.num_outputs))
+
         print("using dense_Tree_pred")
+        # print("tree is:")
+        # from pprint import pprint
+        # pprint(self.trees)
+
         _cext.dense_tree_predict(
             self.children_left, self.children_right, self.children_default,
             self.features, self.thresholds, self.values,

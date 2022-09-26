@@ -208,6 +208,7 @@ class TreeExplainer:
         n_outputs = self.trees[0].values.shape[1]
 
         print("using slow python treeshap")
+        self.trees = [ self.trees[0] ]
         # single instance
         if len(X.shape) == 1:
 
@@ -263,15 +264,18 @@ class TreeExplainer:
         assert len(X.shape) == 1 or len(X.shape) == 2, "Instance must have 1 or 2 dimensions!"
 
         print("uzywajac pythonowego banzhafa")
+        from pprint import pprint
+        pprint(vars(self.trees[0]))
 
-        betas = np.ones(X.shape[0] + 1, dtype=np.float64) #TODO te rozmiary
-        deltas = np.ones(X.shape[0] + 1, dtype=np.float64)
-        deltas_star = np.zeros(X.shape[0] + 1, dtype=np.float64)
-        B = np.zeros(X.shape[0] + 1, dtype=np.float64)
-        S = np.zeros(X.shape[0] + 1, dtype=np.float64)
+
+        betas = np.ones(X.shape[0] + 100, dtype=np.float64) #TODO te rozmiary
+        deltas = np.ones(X.shape[0] + 100, dtype=np.float64)
+        deltas_star = np.zeros(X.shape[0] + 100, dtype=np.float64)
+        B = np.zeros(X.shape[0] + 100, dtype=np.float64)
+        S = np.zeros(X.shape[0] + 100, dtype=np.float64)
 
         H = []
-        for i in range(X.shape[0] + 1):
+        for i in range(X.shape[0] + 100):
             H.append(stack())
 
         x_missing = []  # np.zeros(X.shape[0], dtype=np.bool)
@@ -406,6 +410,9 @@ class TreeExplainer:
             for v in range(1, len(t.children_right)):
                 parent = parents[v]
                 to_return[t.features[parent]] += 2 * (deltas_star[v] - 1) / (1 + deltas_star[v]) * B[v] # TODO deltas z * sa w algorytmie
+
+        print("betas orig:")
+        print(betas)
 
         return list(map(lambda a: a / len(trees), to_return))
 

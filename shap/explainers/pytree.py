@@ -208,7 +208,7 @@ class TreeExplainer:
         n_outputs = self.trees[0].values.shape[1]
 
         print("using slow python treeshap")
-        self.trees = [ self.trees[0] ]
+        # self.trees = [ self.trees[0] ]
         # single instance
         if len(X.shape) == 1:
 
@@ -393,6 +393,7 @@ class TreeExplainer:
 
             return parents_list
 
+        # TODO przejrzec wszystkie petle - czy dobre limity?
         to_return = np.zeros(len(x), dtype=np.float64)
         for i in all_features: # to nam daje maksimum
             betas[i] = 1.0 #TODO byc moze niepotrzebne

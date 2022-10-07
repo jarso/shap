@@ -15,6 +15,7 @@ from .._explanation import Explanation
 from .. import maskers
 import warnings
 import pandas as pd
+from pprint import pprint
 
 warnings.formatwarning = lambda msg, *args, **kwargs: str(msg) + '\n' # ignore everything except the message
 
@@ -388,6 +389,8 @@ class Tree(Explainer):
         # run the core algorithm using the C extension
         assert_import("cext")
         print("using treeshap and cext")
+        print("tree:")
+        pprint(vars(self.model))
         phi = np.zeros((X.shape[0], X.shape[1]+1, self.model.num_outputs))
         if banz:
             _func = _cext.dense_tree_banz
@@ -993,9 +996,9 @@ class TreeEnsemble:
             raise Exception("Model type not yet supported by TreeExplainer: " + str(type(model)))
 
         # build a dense numpy version of all the tree objects
-        self.trees = [ self.trees[0] ] #  TODO wywalic!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        from pprint import pprint
-        pprint(vars(self.trees[0]))
+        # self.trees = [ self.trees[0] ] #  TODO wywalic!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # from pprint import pprint
+        # pprint(vars(self.trees[0]))
 
         if self.trees is not None and self.trees:
             max_nodes = np.max([len(t.values) for t in self.trees])

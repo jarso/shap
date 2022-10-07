@@ -7,7 +7,8 @@
 #include <stack>
 #include <set>
 
-#define COUT(x) std::cout << x << std::endl;
+#define COUT(x) //std::cout << x << std::endl;
+#define SCOUT(s,x) //std::cout << s << " " << x << std::endl;
 #define TAIL parent, tree, features_count, feature_results, betas, deltas, deltas_star, B, S, F, H, tree.node_sample_weights
 
 static PyObject *_cext_dense_tree_shap(PyObject *self, PyObject *args);
@@ -277,6 +278,53 @@ inline void proper_tree_banz(const TreeEnsemble& trees, const ExplanationDataset
 inline void fast(int node, int* parent_list, TreeEnsemble& tree, int features_count, double* feature_results, double* betas, 
     double* deltas, double* deltas_star, double* B, double* S, std::set<int>* F, std::stack<int>** H, double* r) {
 
+    if (node == -1) {
+        return;
+    }
+
+    int parent = parent_list[node];
+    int* features = tree.features;
+    H[features[parent]]->push(node);
+
+    if ((tree.children_left[node] == -1) && (tree.children_right[node] == -1)) {
+        SCOUT("lisciem jest",node)
+        SCOUT("betas",betas[node])
+        SCOUT("values",tree.values[node])
+        S[node] = betas[node] * tree.values[node];
+        SCOUT("S[node] =",S[node])
+    } else {
+        fast(tree.children_left[node],
+            parent_list, tree, features_count, feature_results, betas, deltas, deltas_star, B, S, F, H, r);
+
+        fast(tree.children_right[node],
+            parent_list, tree, features_count, feature_results, betas, deltas, deltas_star, B, S, F, H, r);
+
+        int left_child = tree.children_left[node];
+        int right_child = tree.children_right[node];
+        SCOUT("S[",node)
+        SCOUT("lewy:",left_child)
+        SCOUT("prawy:",right_child)
+        SCOUT("S[lewy]:",S[left_child])
+        SCOUT("S[prawy]:",S[right_child])
+
+        S[node] += (left_child == -1 ? 0 : S[left_child]);
+        S[node] += (right_child == -1 ? 0 : S[right_child]);
+
+        SCOUT("nowy S[node]",S[node])
+    }
+
+    int z = 0;
+    while (H[features[parent]]->top() != node) {
+        z += S[H[features[parent]]->top()];
+        H[features[parent]]->pop();
+    }
+
+    B[node] = S[node] - z;
+
+    if (H[features[parent]]->size() == 1) {
+        H[features[parent]]->pop();
+    }
+
     return;
 }
 
@@ -313,7 +361,7 @@ inline void traverse(int node, const tfloat *x, int* parent_list, TreeEnsemble& 
     b = b * (r[node] / r[parent]);
     betas[node] = b * (1 + deltas[features[parent]]) / 2;
 
-    std::cout << "dla v = " << node << ", betas[v] = " << betas[node] << std::endl;
+//    std::cout << "dla v = " << node << ", betas[v] = " << betas[node] << std::endl;
     COUT("parent")
     COUT(parent)
     COUT("features")
@@ -344,7 +392,7 @@ inline void traverse(int node, const tfloat *x, int* parent_list, TreeEnsemble& 
 
 inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset &data, tfloat *out_contribs,
                      const int feature_dependence, unsigned model_transform, bool interactions) {
-
+    std::cout << "zaczynamy!" << std::endl;
     // initializing values
     // TODO why double and not float / tfloat ???
     int features_count = trees.max_nodes;
@@ -375,6 +423,9 @@ inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset 
 
     // proper calculations
     for (unsigned i = 0; i < trees.tree_limit; ++i) {
+        SCOUT("drzewo nr",i)
+        COUT("ile drzew?")
+        COUT(trees.tree_limit)
         TreeEnsemble tree;
         trees.get_tree(tree, i);
         int* parent = new int[features_count];
@@ -387,28 +438,36 @@ inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset 
         unsigned root = 0; // ?? czy na pewno?
 
         traverse(tree.children_left[root], data.X, TAIL);
-        fast(tree.children_left[root], TAIL);
+//        fast(tree.children_left[root], TAIL);
         traverse(tree.children_right[root], data.X, TAIL);
-        fast(tree.children_right[root], TAIL);
+//        fast(tree.children_right[root], TAIL);
 
         COUT("rozmiary:")
         COUT(data.M) // !! rozmiar probki
         COUT(data.num_X) // !! liczba probek
+        COUT(trees.max_nodes) // !! liczba max wierzcholkow
         COUT("koniec rozmiarow")
 
-        std::cout << "betas for :" << "\n";
-        for (unsigned i = 0; i < trees.max_nodes; ++i)
-            std::cout << betas[i] << std::endl;
-
-        std::cout << "probka: [ " << data.X[0] << ", " << data.X[1] << ", ... ]" << std::endl;
-        for (int ii = 0; ii < trees.max_nodes; ii++)
-            std::cout << ii << " :: " << betas[ii] << std::endl;
+//        std::cout << "betas for :" << "\n";
+//        for (unsigned i = 0; i < trees.max_nodes; ++i)
+//            std::cout << betas[i] << std::endl;
+//
+//        std::cout << "probka: [ " << data.X[0] << ", " << data.X[1] << ", ... ]" << std::endl;
+//        for (int ii = 0; ii < trees.max_nodes; ii++)
+//            std::cout << ii << " :: " << betas[ii] << std::endl;
 
         int number_of_nodes = trees.max_nodes;
         for (unsigned v = 1; v < number_of_nodes; ++v) {
+//            std::cout << "dla node: " << v << " i feature: " << tree.features[parent[v]] << std::endl;
+            COUT(B[v])
+            COUT(deltas_star[v])
             feature_results[tree.features[parent[v]]] += 2 * B[v] * (deltas_star[v] - 1) / (1 + deltas_star[v]);
         }
         delete[] parent;
+    }
+
+    for (unsigned i = 0; i < data.M; ++i) {
+        out_contribs[i] = feature_results[i];
     }
 
     return;

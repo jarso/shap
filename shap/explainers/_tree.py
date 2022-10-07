@@ -993,7 +993,7 @@ class TreeEnsemble:
             raise Exception("Model type not yet supported by TreeExplainer: " + str(type(model)))
 
         # build a dense numpy version of all the tree objects
-        self.trees = [ self.trees[0] ] #  TODO wywalic!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # self.trees = [ self.trees[0] ] #  TODO wywalic!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         from pprint import pprint
         pprint(vars(self.trees[0]))
 

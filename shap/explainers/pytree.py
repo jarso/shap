@@ -208,7 +208,7 @@ class TreeExplainer:
         n_outputs = self.trees[0].values.shape[1]
 
         print("using slow python treeshap")
-        self.trees = [ self.trees[0] ]
+        # self.trees = [ self.trees[0] ]
         # single instance
         if len(X.shape) == 1:
 
@@ -412,6 +412,9 @@ class TreeExplainer:
 
             for v in range(1, len(t.children_right)):
                 parent = parents[v]
+                print("dla node {} i cechy: {}".format(v, t.features[parent]))
+                print(B[v])
+                print(deltas_star[v])
                 to_return[t.features[parent]] += 2 * (deltas_star[v] - 1) / (1 + deltas_star[v]) * B[v] # TODO deltas z * sa w algorytmie
 
         print("betas orig:")
@@ -695,11 +698,17 @@ def fast(node, parent, tree, features, x, betas, deltas, H, B, S):
 
     H[features[parent]].append(node)
     if tree.children_left[node] == -1 and tree.children_right[node] == -1:
+        print("betas: {}".format(betas[node]))
+        print("values: {}".format(tree.values[node]))
         S[node] = betas[node] * tree.values[node] # nie do konca wiem co jest w tablicy tree.values
     else:
         fast(tree.children_left[node], node, tree, features, x, betas, deltas, H, B, S)
         fast(tree.children_right[node], node, tree, features, x, betas, deltas, H, B, S)
+        print("S[lewy]: {}".format(S[tree.children_left[node]]))
+        print("S[prawy]: {}".format(S[tree.children_right[node]]))
+
         S[node] = S[tree.children_left[node]] + S[tree.children_right[node]]
+        print("nowy S[{}]: {}".format(node, S[node]))
 
     z = 0
     while top(H[features[parent]]) != node:

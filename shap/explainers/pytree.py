@@ -263,7 +263,7 @@ class TreeExplainer:
         assert str(type(X)).endswith("'numpy.ndarray'>"), "Unknown instance type: " + str(type(X))
         assert len(X.shape) == 1 or len(X.shape) == 2, "Instance must have 1 or 2 dimensions!"
 
-        self.trees = [ self.trees[0] ] # TODO USUNAC!!!!!!!!!!!!!!
+        # self.trees = [ self.trees[0] ] # TODO USUNAC!!!!!!!!!!!!!!
 
         print("uzywajac pythonowego banzhafa")
         from pprint import pprint

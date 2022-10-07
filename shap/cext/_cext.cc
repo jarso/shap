@@ -7,7 +7,7 @@
 #include <stack>
 #include <set>
 
-#define COUT(x) std::cout << x << std::endl;
+#define COUT(x) // std::cout << x << std::endl;
 #define TAIL parent, tree, features_count, feature_results, betas, deltas, deltas_star, B, S, F, H, tree.node_sample_weights
 
 static PyObject *_cext_dense_tree_shap(PyObject *self, PyObject *args);

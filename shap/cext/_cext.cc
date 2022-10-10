@@ -278,6 +278,7 @@ inline void fast(int node, int* parent_list, TreeEnsemble& tree, int features_co
     double* betas, double* deltas, double* deltas_star, double* B, double* S, std::set<int>* F, 
     std::stack<int>** H, double* r) {
 
+    int u = 6;
     int* features = tree.features;
     int parent = parent_list[node];
 
@@ -320,9 +321,11 @@ inline void traverse(int node, const tfloat *x, int* parent_list, TreeEnsemble& 
     
     if (F->find(features[parent]) != F->end()) { //d_p_v in F
         present = true;
-        b = 2 / (1 + deltas[features[parent]]) * betas[tree.features[node]];
+        b = 2 / (1 + deltas[features[parent]]) * betas[parent];
+//        std::cout << "!!ustawiam b na: 1+ " << deltas[features[parent]] << " / " << betas[tree.features[node]] <<std::endl;
     }
     else {
+//        std::cout << "ustawiam b na: " << betas[parent] <<std::endl;
         present = false;
         F->insert(features[parent]);
         b = betas[parent];
@@ -338,8 +341,16 @@ inline void traverse(int node, const tfloat *x, int* parent_list, TreeEnsemble& 
     }
     deltas_star[node] = deltas[features[parent]];
 
+//    std::cout << "wartosci dla: " << node <<std::endl;
+//    std::cout<< "b: " << b <<std::endl;
+//    std::cout<< "r[node]: " << r[node] <<std::endl;
+//    std::cout<< "r[parent]: " << r[parent] <<std::endl;
+//    std::cout<< "deltas[features[parent]]: " << deltas[features[parent]] <<std::endl;
+//    std::cout << "------------" << std::endl;
+
     b = b * (r[node] / r[parent]);
     betas[node] = b * (1 + deltas[features[parent]]) / 2;
+//    std::cout << "ustawiam betas[" <<node<< "] na "<< betas[node] <<std::endl << std::endl;
 
     // std::cout << "dla v = " << node << ", betas[v] = " << betas[node] << std::endl;
     // COUT("parent")
@@ -429,12 +440,16 @@ void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset &data, 
     for (unsigned i = 0; i < features_count; ++i) {
         COUT(feature_results[i])
     }
-    COUT("banz 2")
+//    std::cout << "betas:" << std::endl;
+//    for (unsigned i = 0; i < trees.max_nodes; ++i) {
+//        cout << "[" << i << "] = " << betas[i] << std::endl;
+//    }
 
     // COUT("wyniki")
     for (unsigned i = 0; i < features_count; ++i) {
         out_contribs[i] = feature_results[i] / trees.tree_limit;
     }
+
 
     // for (unsigned i = 0; i < features_count; ++i) {
     //     delete H[i];

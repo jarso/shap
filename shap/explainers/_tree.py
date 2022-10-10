@@ -389,8 +389,8 @@ class Tree(Explainer):
         # run the core algorithm using the C extension
         assert_import("cext")
         print("using treeshap and cext")
-        print("tree:")
-        pprint(vars(self.model))
+        # print("tree:")
+        # pprint(vars(self.model))
         phi = np.zeros((X.shape[0], X.shape[1]+1, self.model.num_outputs))
         if banz:
             _func = _cext.dense_tree_banz

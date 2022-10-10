@@ -208,7 +208,7 @@ class TreeExplainer:
         n_outputs = self.trees[0].values.shape[1]
 
         print("using slow python treeshap")
-        # self.trees = [ self.trees[0] ]
+        # self.trees = [ self.trees[0] ]  #  TODO USUNAC!!!!!!!!!!!!!!!!!!!!!!
         # single instance
         if len(X.shape) == 1:
 
@@ -266,15 +266,15 @@ class TreeExplainer:
         # self.trees = [ self.trees[0] ] # TODO USUNAC!!!!!!!!!!!!!!
 
         print("uzywajac pythonowego banzhafa")
-        from pprint import pprint
-        pprint(vars(self.trees[0]))
+        # from pprint import pprint
+        # pprint(vars(self.trees[0]))
 
 
-        betas = np.ones(X.shape[0] + 100, dtype=np.float64) #TODO te rozmiary
-        deltas = np.ones(X.shape[0] + 100, dtype=np.float64)
-        deltas_star = np.zeros(X.shape[0] + 100, dtype=np.float64)
-        B = np.zeros(X.shape[0] + 100, dtype=np.float64)
-        S = np.zeros(X.shape[0] + 100, dtype=np.float64)
+        betas = np.ones(X.shape[0] + 1000, dtype=np.float64) #TODO te rozmiary
+        deltas = np.ones(X.shape[0] + 1000, dtype=np.float64)
+        deltas_star = np.zeros(X.shape[0] + 1000, dtype=np.float64)
+        B = np.zeros(X.shape[0] + 1000, dtype=np.float64)
+        S = np.zeros(X.shape[0] + 1000, dtype=np.float64)
 
         H = []
         for i in range(X.shape[0] + 100):
@@ -644,6 +644,7 @@ def traverse(node, parent, tree, features, x, betas, deltas, H, B, r, deltas_sta
 
     if node == -1: # leaf
         return
+    # print("jestem w node nr {}".format(node))
 
     if features[parent] in F: # TODO ?? node.feature?
         print2("present")
@@ -664,6 +665,12 @@ def traverse(node, parent, tree, features, x, betas, deltas, H, B, r, deltas_sta
 
     print2("deltas here: {}".format(deltas[features[parent]]))
     deltas_star[node] = deltas[features[parent]]
+    # print("wartosci dla: {}".format(node))
+    # print("b: {}".format(b))
+    # print("r[node]: {}".format(r[node]))
+    # print("r[parent]: {}".format(r[parent]))
+    # print("deltas[features[parent]]: {}".format(deltas[features[parent]]))
+
     # print("ustawiam delta_star od {} na {}".format(node, deltas[features[parent]]))
     b = b * (r[node] / r[parent])
     betas[node] = b * (1 + deltas[features[parent]]) / 2

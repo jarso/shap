@@ -254,7 +254,12 @@ static PyObject *_cext_dense_tree_shap(PyObject *self, PyObject *args)
 
 static void set_parent(int *parent, int size, TreeEnsemble &tree)
 {
-    for (size_t i = 0; i < size; i++)
+    for (unsigned i = 0; i < size; i++)
+    {
+        parent[i] = -1;
+    }
+
+    for (unsigned i = 0; i < size; i++)
     {
         if (tree.children_right[i] != -1)
         {
@@ -278,7 +283,6 @@ inline void fast(int node, int* parent_list, TreeEnsemble& tree, int features_co
     double* betas, double* deltas, double* deltas_star, double* B, double* S, std::set<int>* F, 
     std::stack<int>** H, double* r) {
 
-    int u = 6;
     int* features = tree.features;
     int parent = parent_list[node];
 
@@ -322,10 +326,8 @@ inline void traverse(int node, const tfloat *x, int* parent_list, TreeEnsemble& 
     if (F->find(features[parent]) != F->end()) { //d_p_v in F
         present = true;
         b = 2 / (1 + deltas[features[parent]]) * betas[parent];
-//        std::cout << "!!ustawiam b na: 1+ " << deltas[features[parent]] << " / " << betas[tree.features[node]] <<std::endl;
     }
     else {
-//        std::cout << "ustawiam b na: " << betas[parent] <<std::endl;
         present = false;
         F->insert(features[parent]);
         b = betas[parent];
@@ -341,30 +343,8 @@ inline void traverse(int node, const tfloat *x, int* parent_list, TreeEnsemble& 
     }
     deltas_star[node] = deltas[features[parent]];
 
-//    std::cout << "wartosci dla: " << node <<std::endl;
-//    std::cout<< "b: " << b <<std::endl;
-//    std::cout<< "r[node]: " << r[node] <<std::endl;
-//    std::cout<< "r[parent]: " << r[parent] <<std::endl;
-//    std::cout<< "deltas[features[parent]]: " << deltas[features[parent]] <<std::endl;
-//    std::cout << "------------" << std::endl;
-
     b = b * (r[node] / r[parent]);
     betas[node] = b * (1 + deltas[features[parent]]) / 2;
-//    std::cout << "ustawiam betas[" <<node<< "] na "<< betas[node] <<std::endl << std::endl;
-
-    // std::cout << "dla v = " << node << ", betas[v] = " << betas[node] << std::endl;
-    // COUT("parent")
-    // COUT(parent)
-    // COUT("features")
-    // COUT(features[parent])
-    // COUT("deltas")
-    // COUT(deltas[features[parent]])
-    // COUT("x[y]")
-    // COUT(x[features[parent]])
-    // COUT("czy?")
-    // COUT((x[features[parent]] < tree.thresholds[parent]))
-
-    
 
     traverse(tree.children_left[node], x, parent_list, tree, features_count, feature_results, betas,
         deltas, deltas_star, B, S, F, H, r);
@@ -387,12 +367,13 @@ void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset &data, 
     // initializing values
     // TODO why double and not float / tfloat ???
     int features_count = data.M;
+    int max_nodes = trees.max_nodes;
     tfloat* feature_results = new tfloat[features_count]; // todo liczba cech
-    tfloat* betas = new tfloat[trees.max_nodes];
+    tfloat* betas = new tfloat[max_nodes];
     tfloat* deltas = new tfloat[features_count]; // todo liczba cech
-    tfloat* deltas_star = new tfloat[trees.max_nodes];
-    tfloat* B = new tfloat[trees.max_nodes];
-    tfloat* S = new tfloat[trees.max_nodes];
+    tfloat* deltas_star = new tfloat[max_nodes];
+    tfloat* B = new tfloat[max_nodes];
+    tfloat* S = new tfloat[max_nodes];
 
     std::set<int>* F = new std::set<int>;
 
@@ -403,21 +384,20 @@ void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset &data, 
         deltas[i] = 1;
         feature_results[i] = 0;
     }
-    
-    for (unsigned i = 0; i < trees.max_nodes; ++i) {
+    for (unsigned i = 0; i < max_nodes; ++i) {
         deltas_star[i] = 0;
         betas[i] = 1;
         B[i] = 0;
         S[i] = 0;
     }
 
-    int* parent = new int[features_count];
+    int* parent = new int[max_nodes];
     COUT("banz 1")
     // proper calculations
     for (unsigned i = 0; i < trees.tree_limit; ++i) {
         TreeEnsemble tree;
         trees.get_tree(tree, i);
-        set_parent(parent, trees.max_nodes, tree);
+        set_parent(parent, max_nodes, tree);
 
         // std::cout<<"parent:\n";
         // for (int ii = 0; ii < trees.max_nodes; ii++)
@@ -432,38 +412,30 @@ void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset &data, 
 
         int number_of_nodes = trees.max_nodes;
         for (unsigned v = 1; v < number_of_nodes; ++v) {
+            if (parent[v] == -1) {
+                continue;
+            }
             feature_results[tree.features[parent[v]]] += 2 * B[v] * (deltas_star[v] - 1) / (1 + deltas_star[v]);
         }
     }
-    // delete[] parent;
 
+    std::cout << "using cext banz" <<std::endl;
     for (unsigned i = 0; i < features_count; ++i) {
-        COUT(feature_results[i])
-    }
-//    std::cout << "betas:" << std::endl;
-//    for (unsigned i = 0; i < trees.max_nodes; ++i) {
-//        cout << "[" << i << "] = " << betas[i] << std::endl;
-//    }
-
-    // COUT("wyniki")
-    for (unsigned i = 0; i < features_count; ++i) {
-        out_contribs[i] = feature_results[i] / trees.tree_limit;
+        out_contribs[i] = feature_results[i]; // / trees.tree_limit;
     }
 
-
-    // for (unsigned i = 0; i < features_count; ++i) {
-    //     delete H[i];
-    // }
-    // delete[] H;
-
-    // delete[] feature_results;
-    // delete[] betas;
-    // delete[] deltas;
-    // delete[] deltas_star;
-    // delete[] B;
-    // delete[] S;
-
-    // delete F;
+    for (unsigned i = 0; i < features_count; ++i) {
+         delete H[i];
+    }
+    delete[] H;
+    delete[] parent;
+    delete[] feature_results;
+    delete[] betas;
+    delete[] deltas;
+    delete[] deltas_star;
+    delete[] B;
+    delete[] S;
+    delete F;
 
     return;
 }

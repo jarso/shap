@@ -168,6 +168,7 @@ class TreeExplainer:
             self.trees = model
         else:
             raise Exception("Model type not supported by TreeExplainer: " + str(type(model)))
+        # self.trees = [self.trees[len(self.trees) - 1]]
 
         if self.model_type == "internal":
             # Preallocate space for the unique path data
@@ -268,7 +269,8 @@ class TreeExplainer:
         print("uzywajac pythonowego banzhafa")
         # from pprint import pprint
         # pprint(vars(self.trees[0]))
-
+        # print("2 drzewo: ---------------------------------")
+        # pprint(vars(self.trees[1]))
 
         betas = np.ones(X.shape[0] + 1000, dtype=np.float64) #TODO te rozmiary
         deltas = np.ones(X.shape[0] + 1000, dtype=np.float64)
@@ -401,7 +403,7 @@ class TreeExplainer:
             H[i] = stack()
             # TODO wyzerowac inne!
         F = []
-        print("ile drzew? {}".format(len(trees)))
+        print("ile drzew .py? {}".format(len(trees)))
         for t in trees:
             parents = _get_parents(t)
             proba_list = self.count_node_proba(t)

@@ -394,10 +394,12 @@ class Tree(Explainer):
         phi = np.zeros((X.shape[0], X.shape[1]+1, self.model.num_outputs))
         if banz:
             _func = _cext.dense_tree_banz
+            check_additivity = False # TODO czemu sie nie sumuje?
         else:
             _func = _cext.dense_tree_shap
 
         if not approximate:
+            print("banz = " + str(banz))
             _func(
                 self.model.children_left, self.model.children_right, self.model.children_default,
                 self.model.features, self.model.thresholds, self.model.values, self.model.node_sample_weight,
@@ -996,9 +998,12 @@ class TreeEnsemble:
             raise Exception("Model type not yet supported by TreeExplainer: " + str(type(model)))
 
         # build a dense numpy version of all the tree objects
-        # self.trees = [ self.trees[0] ] #  TODO wywalic!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        print("ile drzew cext? {}".format(len(self.trees)))
+        # self.trees = [ self.trees[len(self.trees) - 1] ] #  TODO wywalic!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         # from pprint import pprint
         # pprint(vars(self.trees[0]))
+        # print("2 drzewo: ---------------------------------")
+        # pprint(vars(self.trees[1]))
 
         if self.trees is not None and self.trees:
             max_nodes = np.max([len(t.values) for t in self.trees])

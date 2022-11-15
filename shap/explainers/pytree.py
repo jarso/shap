@@ -237,11 +237,9 @@ class TreeExplainer:
             else:
                 return [phi[:, :, i] for i in range(n_outputs)]
 
-    def banz_values(self, X, tree_limit=-1, **kwargs):
+    def banz_values(self, X, tree_limit=-1, jit=False, **kwargs):
         print("nasza implementacja banz values")
 
-        # shortcut using the C++ version of Tree SHAP in XGBoost and LightGBM
-        # these are about 10x faster than the numba jit'd implementation below...
         if self.model_type == "xgboost":
             import xgboost
             if not str(type(X)).endswith("xgboost.core.DMatrix'>"):
@@ -263,14 +261,7 @@ class TreeExplainer:
 
         assert str(type(X)).endswith("'numpy.ndarray'>"), "Unknown instance type: " + str(type(X))
         assert len(X.shape) == 1 or len(X.shape) == 2, "Instance must have 1 or 2 dimensions!"
-
-        # self.trees = [ self.trees[0] ] # TODO USUNAC!!!!!!!!!!!!!!
-
-        print("uzywajac pythonowego banzhafa")
-        # from pprint import pprint
-        # pprint(vars(self.trees[0]))
-        # print("2 drzewo: ---------------------------------")
-        # pprint(vars(self.trees[1]))
+        # print("uzywajac pythonowego banzhafa")
 
         betas = np.ones(X.shape[0] + 1000, dtype=np.float64) #TODO te rozmiary
         deltas = np.ones(X.shape[0] + 1000, dtype=np.float64)
@@ -292,12 +283,17 @@ class TreeExplainer:
         features = list(features_list.keys()) # TODO to maja byc features dla calego datasetu globalne
         features.remove(-2) # -2 to dummy feature dla lisci
 
+        if jit:
+            _func = self.tree_banz_jit
+            print("using numba py banz")
+        else:
+            _func = self.tree_banz
         # single instance
         if len(X.shape) == 1:
             print("jeden wymiar")
 
             # features to tablice intow, features[i] mowi na podst. jakiego featura dzieli probki wezel i w drzewie
-            res = self.tree_banz(self.trees, features, X, betas, deltas, deltas_star, H, B, 0, S)
+            res = _func(self.trees, features, X, betas, deltas, deltas_star, H, B, S)
 
             return res
             # if n_outputs == 1:
@@ -309,7 +305,7 @@ class TreeExplainer:
 
             res = []
             for i in range(X.shape[0]):
-                res_part = self.tree_banz(self.trees, features, X[i,:], betas, deltas, deltas_star, H, B, i, S)
+                res_part = _func(self.trees, features, X[i,:], betas, deltas, deltas_star, H, B, i, S)
                 res.append(res_part)
 
         #     if n_outputs == 1:
@@ -384,7 +380,10 @@ class TreeExplainer:
 
         return to_return / 2 ** (n - 1)
 
-    def tree_banz(self, trees, all_features, x, betas, deltas, deltas_star, H, B, ii, S):
+    def tree_banz_jit(self, trees, all_features, x, betas, deltas, deltas_star, H, B, S):
+        return proper_tree_banz(trees, all_features, x, betas, deltas, deltas_star, H, B, S)
+
+    def tree_banz(self, trees, all_features, x, betas, deltas, deltas_star, H, B, S):
         def _get_parents(tree):
             parents_list = [None] * len(tree.children_right)
             for j in range(len(tree.children_right)):
@@ -395,6 +394,10 @@ class TreeExplainer:
 
             return parents_list
 
+        def _count_node_proba(tree):
+            samples = tree.node_sample_weight
+            return [el / samples[0] for el in samples]
+
         # TODO przejrzec wszystkie petle - czy dobre limity?
         to_return = np.zeros(len(x), dtype=np.float64)
         for i in all_features: # to nam daje maksimum
@@ -403,10 +406,10 @@ class TreeExplainer:
             H[i] = stack()
             # TODO wyzerowac inne!
         F = []
-        print("ile drzew .py? {}".format(len(trees)))
+        # print("ile drzew .py? {}".format(len(trees)))
         for t in trees:
             parents = _get_parents(t)
-            proba_list = self.count_node_proba(t)
+            proba_list = _count_node_proba(t)
 
             p = 0 # root ma zawsze id == 0
             for v in [t.children_left[p], t.children_right[p]]:
@@ -417,15 +420,55 @@ class TreeExplainer:
                 parent = parents[v]
                 to_return[t.features[parent]] += 2 * (deltas_star[v] - 1) / (1 + deltas_star[v]) * B[v] # TODO deltas z * sa w algorytmie
 
-        print("betas orig:")
-        print(betas)
+        # print("betas orig:")
+        # print(betas)
 
         return list(map(lambda a: a / len(trees), to_return))
 
-    def count_node_proba(self, tree):
+
+#@numba.jit(nopython=True, nogil=True)
+def proper_tree_banz(trees, all_features, x, betas, deltas, deltas_star, H, B, S):
+    def _get_parents(tree):
+        parents_list = [None] * len(tree.children_right)
+        for j in range(len(tree.children_right)):
+            if tree.children_right[j] != -1:
+                parents_list[tree.children_right[j]] = j
+            if tree.children_left[j] != -1:
+                parents_list[tree.children_left[j]] = j
+
+        return parents_list
+
+    def _count_node_proba(tree):
         samples = tree.node_sample_weight
         to_return = [x / samples[0] for x in samples]
         return to_return
+
+    # TODO przejrzec wszystkie petle - czy dobre limity?
+    to_return = np.zeros(len(x), dtype=np.float64)
+    for i in all_features:  # to nam daje maksimum
+        betas[i] = 1.0  # TODO byc moze niepotrzebne
+        deltas[i] = 1.0  # jw
+        H[i] = stack()
+        # TODO wyzerowac inne!
+    F = []
+    # print("ile drzew .py? {}".format(len(trees)))
+    for t in trees:
+        parents = _get_parents(t)
+        proba_list = _count_node_proba(t)
+
+        p = 0  # root ma zawsze id == 0
+        for v in [t.children_left[p], t.children_right[p]]:
+            traverse(v, 0, t, t.features, x, betas, deltas, H, B, proba_list, deltas_star, F, trees.index(t) == 0)
+            fast(v, 0, t, t.features, x, betas, deltas, H, B, S)
+
+        for v in range(1, len(t.children_right)):
+            parent = parents[v]
+            to_return[t.features[parent]] += 2 * (deltas_star[v] - 1) / (1 + deltas_star[v]) * B[v]
+
+    # print("betas orig:")
+    # print(betas)
+
+    return list(map(lambda a: a / len(trees), to_return))
 
 
 # extend our decision path with a fraction of one and zero extensions

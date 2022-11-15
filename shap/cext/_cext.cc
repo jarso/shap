@@ -252,6 +252,7 @@ static PyObject *_cext_dense_tree_shap(PyObject *self, PyObject *args)
     return ret;
 }
 
+/*
 static void set_parent(int *parent, int size, TreeEnsemble &tree)
 {
     for (unsigned i = 0; i < size; i++)
@@ -272,6 +273,7 @@ static void set_parent(int *parent, int size, TreeEnsemble &tree)
         }
     }
 }
+*/
 
 
 inline void proper_tree_banz(const TreeEnsemble& trees, const ExplanationDataset &data, tfloat *out_contribs) {
@@ -279,7 +281,7 @@ inline void proper_tree_banz(const TreeEnsemble& trees, const ExplanationDataset
 }
 
 
-inline void fast(int node, int* parent_list, TreeEnsemble& tree, int features_count, double* feature_results, 
+inline void fast(int node, int* parent_list, TreeEnsemble& tree, int features_count, double* feature_results,
     double* betas, double* deltas, double* deltas_star, double* B, double* S, std::set<int>* F, 
     std::stack<int>** H, double* r) {
 
@@ -364,6 +366,10 @@ inline void traverse(int node, const tfloat *x, int* parent_list, TreeEnsemble& 
 void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset &data, tfloat *out_contribs,
                      const int feature_dependence, unsigned model_transform, bool interactions) {
 
+    std::cout << "using cext banz" <<std::endl;
+    ExplanationDataset instance;
+    tfloat* instance_out_contribs = out_contribs;
+
     // initializing values
     // TODO why double and not float / tfloat ???
     int features_count = data.M;
@@ -392,40 +398,39 @@ void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset &data, 
     }
 
     int* parent = new int[max_nodes];
-    COUT("banz 1")
-    // proper calculations
-    for (unsigned i = 0; i < trees.tree_limit; ++i) {
-        TreeEnsemble tree;
-        trees.get_tree(tree, i);
-        set_parent(parent, max_nodes, tree);
 
-        // std::cout<<"parent:\n";
-        // for (int ii = 0; ii < trees.max_nodes; ii++)
-        //     std::cout << parent[ii] << std::endl;
+    for (unsigned j = 0; j < data.num_X; ++j) {
+        instance_out_contribs = out_contribs + j * (data.M + 1) * trees.num_outputs;
+        data.get_x_instance(instance, j);
 
-        unsigned root = 0; // ?? czy na pewno?
+        // proper calculations
+        for (unsigned i = 0; i < trees.tree_limit; ++i) {
+            TreeEnsemble tree;
+            trees.get_tree(tree, i);
+            set_parent(parent, max_nodes, tree);
+            unsigned root = 0;
 
-        traverse(tree.children_left[root], data.X, TAIL);
-        fast(tree.children_left[root], TAIL);
-        traverse(tree.children_right[root], data.X, TAIL);
-        fast(tree.children_right[root], TAIL);
+            traverse(tree.children_left[root], data.X, TAIL);
+            fast(tree.children_left[root], TAIL);
+            traverse(tree.children_right[root], data.X, TAIL);
+            fast(tree.children_right[root], TAIL);
 
-        int number_of_nodes = trees.max_nodes;
-        for (unsigned v = 1; v < number_of_nodes; ++v) {
-            if (parent[v] == -1) {
-                continue;
+            int number_of_nodes = trees.max_nodes;
+            for (unsigned v = 1; v < number_of_nodes; ++v) {
+                if (parent[v] == -1) {
+                    continue;
+                }
+                feature_results[tree.features[parent[v]]] += 2 * B[v] * (deltas_star[v] - 1) / (1 + deltas_star[v]);
             }
-            feature_results[tree.features[parent[v]]] += 2 * B[v] * (deltas_star[v] - 1) / (1 + deltas_star[v]);
+        }
+
+        for (unsigned i = 0; i < features_count; ++i) {
+            instance_out_contribs[i] = feature_results[i]; // / trees.tree_limit;
         }
     }
 
-    std::cout << "using cext banz" <<std::endl;
     for (unsigned i = 0; i < features_count; ++i) {
-        out_contribs[i] = feature_results[i]; // / trees.tree_limit;
-    }
-
-    for (unsigned i = 0; i < features_count; ++i) {
-         delete H[i];
+     delete H[i];
     }
     delete[] H;
     delete[] parent;

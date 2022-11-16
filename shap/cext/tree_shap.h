@@ -1564,7 +1564,7 @@ inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset 
     }
 
     for (unsigned i = 0; i < features_count; ++i) {
-     delete H[i];
+        delete H[i];
     }
     delete[] H;
     delete[] parent;

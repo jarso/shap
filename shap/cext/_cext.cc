@@ -280,7 +280,7 @@ inline void proper_tree_banz(const TreeEnsemble& trees, const ExplanationDataset
     return;
 }
 
-
+/*
 inline void fast(int node, int* parent_list, TreeEnsemble& tree, int features_count, double* feature_results,
     double* betas, double* deltas, double* deltas_star, double* B, double* S, std::set<int>* F, 
     std::stack<int>** H, double* r) {
@@ -444,6 +444,7 @@ void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset &data, 
 
     return;
 }
+*/
 
 static PyObject *_cext_dense_tree_banz(PyObject *self, PyObject *args)
 {

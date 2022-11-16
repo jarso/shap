@@ -239,6 +239,8 @@ class TreeExplainer:
 
     def banz_values(self, X, tree_limit=-1, jit=False, **kwargs):
         print("nasza implementacja banz values")
+        import time
+        start = time.time()
 
         if self.model_type == "xgboost":
             import xgboost
@@ -289,6 +291,8 @@ class TreeExplainer:
         else:
             _func = self.tree_banz
         # single instance
+        print("wlasciwe obliczenia w sekundzie: {}".format(time.time() - start))
+
         if len(X.shape) == 1:
             print("jeden wymiar")
 
@@ -305,7 +309,7 @@ class TreeExplainer:
 
             res = []
             for i in range(X.shape[0]):
-                res_part = _func(self.trees, features, X[i,:], betas, deltas, deltas_star, H, B, i, S)
+                res_part = _func(self.trees, features, X[i,:], betas, deltas, deltas_star, H, B, S)
                 res.append(res_part)
 
         #     if n_outputs == 1:
@@ -683,20 +687,14 @@ def tree_banz_recursive(children_left, children_right, children_default, feature
 
 
 def traverse(node, parent, tree, features, x, betas, deltas, H, B, r, deltas_star, F, should_print):
-    def print2(str):
-        if parent == -9 and should_print:
-            print(str)
-
     if node == -1: # leaf
         return
     # print("jestem w node nr {}".format(node))
 
     if features[parent] in F: # TODO ?? node.feature?
-        print2("present")
         present = True
         b = 2 / (1 + deltas[features[parent]]) * betas[parent]
     else:
-        print2("not present")
         present = False
         F.append(features[parent])
         b = betas[parent]
@@ -708,7 +706,6 @@ def traverse(node, parent, tree, features, x, betas, deltas, H, B, r, deltas_sta
     else:
         deltas[features[parent]] = deltas[features[parent]] * float(x[features[parent]] >= tree.thresholds[parent])
 
-    print2("deltas here: {}".format(deltas[features[parent]]))
     deltas_star[node] = deltas[features[parent]]
     # print("wartosci dla: {}".format(node))
     # print("b: {}".format(b))
@@ -719,21 +716,13 @@ def traverse(node, parent, tree, features, x, betas, deltas, H, B, r, deltas_sta
     # print("ustawiam delta_star od {} na {}".format(node, deltas[features[parent]]))
     b = b * (r[node] / r[parent])
     betas[node] = b * (1 + deltas[features[parent]]) / 2
-    print2("betas:")
-    print2(betas[node])
-    print2(type(betas[node]))
 
     for child in [tree.children_left[node], tree.children_right[node]]:
-        print2("child:")
-        print2(child)
         traverse(child, node, tree, features, x, betas, deltas, H, B, r, deltas_star, F, False)
 
     if not present:
         F.remove(features[parent])
 
-    print2("delta old:")
-    print2(delta_old)
-    print2(type(delta_old))
     deltas[features[parent]] = delta_old
 
 

@@ -1416,8 +1416,48 @@ static void set_parent(int *parent, int size, TreeEnsemble &tree)
     }
 }
 
+class mySet {
+    private:
+        bool* test;
+        int max_nodes;
+    public:
+        mySet(int max_nodes) {
+            this->test = (bool*)calloc(max_nodes, sizeof(bool));
+//            for (int i = 0; i < max_nodes; i++) {
+//                test[i] = false;
+//            }
+        }
+        ~mySet() {
+            free(this->test);
+        }
+        void insert(int x) {
+            if (x < this->max_nodes)
+                this->test[x] = true;
+        }
+        void erase(int x) {
+            if (x < this->max_nodes)
+                this->test[x] = false;
+        }
+        bool find(int x) {
+            if (x < this->max_nodes)
+                return this->test[x];
+            return false;
+            // moznaby zrobic 1 return zakladajac leniwe wyliczanie
+        }
+        bool end() {
+            return false;
+            // taki hack
+        }
+};
+
+//typedef mySet std::set<int>;
+
+
+class myStack {};
+
+
 inline void fast(int node, int* parent_list, TreeEnsemble& tree, int features_count, double* feature_results,
-    double* betas, double* deltas, double* deltas_star, double* B, double* S, std::set<int>* F,
+    double* betas, double* deltas, double* deltas_star, double* B, double* S, mySet* F,//std::set<int>* F,
     std::stack<int>** H, double* r) {
 
     int* features = tree.features;
@@ -1451,7 +1491,7 @@ inline void fast(int node, int* parent_list, TreeEnsemble& tree, int features_co
 
 inline void traverse(int node, const tfloat *x, int* parent_list, TreeEnsemble& tree, int features_count,
     double* feature_results, double* betas, double* deltas, double* deltas_star, double* B, double* S,
-    std::set<int>* F, std::stack<int>** H, double* r) {
+    /*std::set<int>* F,*/ mySet* F, std::stack<int>** H, double* r) {
 
     bool present;
     double b, delta_old;
@@ -1514,8 +1554,8 @@ inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset 
     tfloat* B = new tfloat[max_nodes];
     tfloat* S = new tfloat[max_nodes];
 
-    std::set<int>* F = new std::set<int>;
-
+//    std::set<int>* F = new std::set<int>;
+    mySet* F = new mySet(max_nodes);
     std::stack<int>** H = new std::stack<int>*[features_count]; // todo liczba cech
 
     for (unsigned i = 0; i < features_count; ++i) {
@@ -1535,7 +1575,6 @@ inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset 
     for (unsigned j = 0; j < data.num_X; ++j) {
         instance_out_contribs = out_contribs + j * (data.M + 1) * trees.num_outputs;
         data.get_x_instance(instance, j);
-        COUT("banz 1")
 
         // proper calculations
         for (unsigned i = 0; i < trees.tree_limit; ++i) {

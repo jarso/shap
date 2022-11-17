@@ -8,8 +8,8 @@ import time
 import cProfile
 pr = cProfile.Profile()
 
-X, y = make_regression(n_samples=100, n_features=6, n_informative=2,random_state=0, shuffle=False)
-regr = RandomForestRegressor(max_depth=6, random_state=0)
+X, y = make_regression(n_samples=200, n_features=16, n_informative=8,random_state=0, shuffle=False)
+regr = RandomForestRegressor(max_depth=9, n_estimators=1000, random_state=0)
 regr.fit(X, y)
 model = regr
 
@@ -26,7 +26,10 @@ model = regr
 
 start = time.time()
 t = TreeCext(model).shap_values(X, banz=True)
+print(t[0])
+print(t[2])
 print(time.time() - start)
+
 
 
 # start = time.time()

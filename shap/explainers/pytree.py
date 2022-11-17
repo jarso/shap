@@ -316,7 +316,8 @@ class TreeExplainer:
         #         return phi[:, :, 0]
         #     else:
         #         return [phi[:, :, i] for i in range(n_outputs)]
-            return res
+            print("typ resa: {}, {}".format(type(res), type(res[0])))
+            return np.asarray(res)
 
     def shap_interaction_values(self, X, tree_limit=-1, **kwargs):
 

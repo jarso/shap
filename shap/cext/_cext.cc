@@ -490,7 +490,7 @@ inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset 
             TreeEnsemble tree;
             trees.get_tree(tree, i);
             set_parent(parent, max_nodes, tree);
-            F->reset();
+//            F->reset();
             unsigned root = 0; // ?? czy na pewno?
 
             traverse(tree.children_left[root], instance.X, TAIL);

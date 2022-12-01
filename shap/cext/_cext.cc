@@ -449,12 +449,10 @@ inline void fast(int node, int* parent_list, TreeEnsemble& tree, int features_co
 inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset &data, tfloat *out_contribs,
                      const int feature_dependence, unsigned model_transform, bool interactions) {
 
-    std::cout << "using cext banz" <<std::endl;
     ExplanationDataset instance;
     tfloat* instance_out_contribs = out_contribs;
 
     // initializing values
-    // TODO why double and not float / tfloat ???
     int features_count = data.M;
     int max_nodes = trees.max_nodes;
     tfloat* feature_results = new tfloat[features_count]; // todo liczba cech
@@ -465,7 +463,6 @@ inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset 
     tfloat* S = new tfloat[max_nodes];
 
     std::set<int>* F = new std::set<int>;
-//    mySet* F = new mySet(max_nodes);
     std::stack<int>** H = new std::stack<int>*[features_count]; // todo liczba cech
 
     int* parent = new int[max_nodes];

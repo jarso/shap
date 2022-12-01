@@ -206,7 +206,7 @@ class TreeExplainer:
 
         return to_return / len(x)
 
-    def brute_banz(self, x, i):  # TODO uogolnic obie metody
+    def brute_banz(self, x, i):
         to_return = 0
         n = len(x)
         p = [_a for _a in list(range(n)) if _a != i]

@@ -637,9 +637,7 @@ static PyObject *_cext_dense_tree_banz(PyObject *self, PyObject *args)
     );
     ExplanationDataset data = ExplanationDataset(X, X_missing, y, R, R_missing, num_X, M, num_R);
 
-    COUT("dense tree banz 2")
     dense_tree_banz(trees, data, out_contribs, feature_dependence, model_output, interactions);
-    COUT("dense tree banz 3")
 
     // retrieve return value before python cleanup of objects
     tfloat ret_value = (double)values[0];

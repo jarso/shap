@@ -7,7 +7,9 @@ import numpy as np
 from collections import deque as stack
 from functools import reduce
 from itertools import chain, combinations
-#import numba
+
+
+# import numba
 # from .explainer import Explainer
 
 # class TreeExplainer(Explainer):
@@ -137,17 +139,6 @@ from itertools import chain, combinations
 #                 self.values
 #             )
 
-
-def product(iterable):
-    return reduce(lambda a, b: a * b, iterable, 1)
-
-
-def powerset(iterable):
-    _s = list(iterable)
-    _l = list(chain.from_iterable(combinations(_s, _r) for _r in range(len(_s) + 1)))
-    return [list(_a) for _a in _l]
-
-
 class TreeExplainer:
     """ A pure Python (slow) implementation of Tree SHAP.
     """
@@ -179,24 +170,68 @@ class TreeExplainer:
             self.one_fractions = np.zeros(s, dtype=np.float64)
             self.pweights = np.zeros(s, dtype=np.float64)
 
-    def shap_values(self, X, tree_limit=-1, **kwargs):
-        print("oryginalna implemenacja shap_values")
+    def _product(self, _iterable):
+        return reduce(lambda a, b: a * b, _iterable, 1)
 
-        # shortcut using the C++ version of Tree SHAP in XGBoost and LightGBM
-        # these are about 10x faster than the numba jit'd implementation below...
+    def _powerset(self, _iterable):
+        _s = list(_iterable)
+        _l = list(chain.from_iterable(combinations(_s, _r) for _r in range(len(_s) + 1)))
+        return [list(_a) for _a in _l]
+
+    def _coalition_value(self, x, _S):
+        def _desc(v, tree):
+            if tree.features[v] == -2:  # is a leaf
+                return tree.values[v]
+            else:
+                if tree.features[v] in _S:
+                    if x[tree.features[v]] < tree.thresholds[v]:
+                        return _desc(tree.children_left[v], tree)
+                    else:
+                        return _desc(tree.children_right[v], tree)
+                else:
+                    r = [_x / tree.node_sample_weight[0] for _x in tree.node_sample_weight]
+                    return (r[tree.children_left[v]] * _desc(tree.children_left[v], tree) +
+                            r[tree.children_right[v]] * _desc(tree.children_right[v], tree)) / r[v]
+
+        return (reduce(lambda a, b: a + b, [_desc(0, i) for i in self.trees])) / len(self.trees)
+
+    def brute_shap(self, x, i):
+        to_return = 0
+        n = len(x)
+        p = [_a for _a in list(range(n)) if _a != i]
+        for _S in self._powerset(p):
+            _tmp = (self._product(range(1, n - len(_S))) / self._product(range(len(_S) + 1, n)))
+            _tmp *= (self._coalition_value(x, _S + [i]) - self._coalition_value(x, _S))
+            to_return += _tmp
+
+        return to_return / len(x)
+
+    def brute_banz(self, x, i):  # TODO uogolnic obie metody
+        to_return = 0
+        n = len(x)
+        p = [_a for _a in list(range(n)) if _a != i]
+        for _S in self._powerset(p):
+            _tmp = (self._coalition_value(x, _S + [i]) - self._coalition_value(x, _S))
+            to_return += _tmp
+
+        return to_return / 2 ** (n - 1)
+
+    class TreeModelType:
+        def __init__(self, model_type, value):
+            self.model_type = model_type
+            self.value = value
+
+    def model_assertions(self, X, tree_limit):
         if self.model_type == "xgboost":
             import xgboost
             if not str(type(X)).endswith("xgboost.core.DMatrix'>"):
                 X = xgboost.DMatrix(X)
-            if tree_limit==-1:
-                tree_limit=0
-            print("xgboost model type")
-            return self.trees.predict(X, ntree_limit=tree_limit, pred_contribs=True)
+            if tree_limit == -1:
+                tree_limit = 0
+            return self.TreeModelType(True, self.trees.predict(X, ntree_limit=tree_limit, pred_contribs=True))
         elif self.model_type == "lightgbm":
-            print("lightgbm model type")
-            return self.trees.predict(X, num_iteration=tree_limit, pred_contrib=True)
+            return self.TreeModelType(True, self.trees.predict(X, num_iteration=tree_limit, pred_contrib=True))
 
-        print("other model type")
         # convert dataframes
         if str(type(X)).endswith("pandas.core.series.Series'>"):
             X = X.values
@@ -206,9 +241,15 @@ class TreeExplainer:
         assert str(type(X)).endswith("'numpy.ndarray'>"), "Unknown instance type: " + str(type(X))
         assert len(X.shape) == 1 or len(X.shape) == 2, "Instance must have 1 or 2 dimensions!"
 
+        return self.TreeModelType(False, None)
+
+    def shap_values(self, X, tree_limit=-1, **kwargs):
+        model = self.model_assertions(X, tree_limit)
+        if (model.model_type):
+            return model.value
+
         n_outputs = self.trees[0].values.shape[1]
 
-        print("using slow python treeshap")
         # self.trees = [ self.trees[0] ]  #  TODO USUNAC!!!!!!!!!!!!!!!!!!!!!!
         # single instance
         if len(X.shape) == 1:
@@ -229,7 +270,7 @@ class TreeExplainer:
             x_missing = np.zeros(X.shape[1], dtype=np.bool)
             for i in range(X.shape[0]):
                 for t in self.trees:
-                    self.tree_shap(t, X[i,:], x_missing, phi[i,:,:])
+                    self.tree_shap(t, X[i, :], x_missing, phi[i, :, :])
             phi /= len(self.trees)
 
             if n_outputs == 1:
@@ -239,33 +280,11 @@ class TreeExplainer:
 
     def banz_values(self, X, tree_limit=-1, jit=False, **kwargs):
         print("nasza implementacja banz values")
-        import time
-        start = time.time()
+        model = self.model_assertions(X, tree_limit)
+        if (model.model_type):
+            return model.value
 
-        if self.model_type == "xgboost":
-            import xgboost
-            if not str(type(X)).endswith("xgboost.core.DMatrix'>"):
-                X = xgboost.DMatrix(X)
-            if tree_limit==-1:
-                tree_limit=0
-            print("xgboost model type")
-            return self.trees.predict(X, ntree_limit=tree_limit, pred_contribs=True)
-        elif self.model_type == "lightgbm":
-            print("lightgbm model type")
-            return self.trees.predict(X, num_iteration=tree_limit, pred_contrib=True)
-
-        print("other model type")
-        # convert dataframes
-        if str(type(X)).endswith("pandas.core.series.Series'>"):
-            X = X.values
-        elif str(type(X)).endswith("pandas.core.frame.DataFrame'>"):
-            X = X.values
-
-        assert str(type(X)).endswith("'numpy.ndarray'>"), "Unknown instance type: " + str(type(X))
-        assert len(X.shape) == 1 or len(X.shape) == 2, "Instance must have 1 or 2 dimensions!"
-        # print("uzywajac pythonowego banzhafa")
-
-        betas = np.ones(X.shape[0] + 1000, dtype=np.float64) #TODO te rozmiary
+        betas = np.ones(X.shape[0] + 1000, dtype=np.float64)  # TODO te rozmiary
         deltas = np.ones(X.shape[0] + 1000, dtype=np.float64)
         deltas_star = np.zeros(X.shape[0] + 1000, dtype=np.float64)
         B = np.zeros(X.shape[0] + 1000, dtype=np.float64)
@@ -275,15 +294,13 @@ class TreeExplainer:
         for i in range(X.shape[0] + 100):
             H.append(stack())
 
-        x_missing = []  # np.zeros(X.shape[0], dtype=np.bool)
-
         features_list = {}
         for t in self.trees:
             for i in t.features:
                 features_list[i] = True
 
-        features = list(features_list.keys()) # TODO to maja byc features dla calego datasetu globalne
-        features.remove(-2) # -2 to dummy feature dla lisci
+        features = list(features_list.keys())  # TODO to maja byc features dla calego datasetu globalne
+        features.remove(-2)  # -2 to dummy feature dla lisci
 
         if jit:
             _func = self.tree_banz_jit
@@ -291,32 +308,20 @@ class TreeExplainer:
         else:
             _func = self.tree_banz
         # single instance
-        print("wlasciwe obliczenia w sekundzie: {}".format(time.time() - start))
 
         if len(X.shape) == 1:
             print("jeden wymiar")
-
             # features to tablice intow, features[i] mowi na podst. jakiego featura dzieli probki wezel i w drzewie
             res = _func(self.trees, features, X, betas, deltas, deltas_star, H, B, S)
-
             return res
-            # if n_outputs == 1:
-            #     return phi[:, 0]
-            # else:
-            #     return [phi[:, i] for i in range(n_outputs)]
-        elif len(X.shape) == 2:
-            print("dwa wymiary")    # TODO NIE DZIALA FORMAT DANYCH
 
+        elif len(X.shape) == 2:
+            print("dwa wymiary")  # TODO NIE DZIALA FORMAT DANYCH
             res = []
             for i in range(X.shape[0]):
-                res_part = _func(self.trees, features, X[i,:], betas, deltas, deltas_star, H, B, S)
+                res_part = _func(self.trees, features, X[i, :], betas, deltas, deltas_star, H, B, S)
                 res.append(res_part)
 
-        #     if n_outputs == 1:
-        #         return phi[:, :, 0]
-        #     else:
-        #         return [phi[:, :, i] for i in range(n_outputs)]
-            print("typ resa: {}, {}".format(type(res), type(res[0])))
             return np.asarray(res)
 
     def shap_interaction_values(self, X, tree_limit=-1, **kwargs):
@@ -326,8 +331,8 @@ class TreeExplainer:
             import xgboost
             if not str(type(X)).endswith("xgboost.core.DMatrix'>"):
                 X = xgboost.DMatrix(X)
-            if tree_limit==-1:
-                tree_limit=0
+            if tree_limit == -1:
+                tree_limit = 0
             return self.trees.predict(X, ntree_limit=tree_limit, pred_interactions=True)
         else:
             raise Exception("Interaction values not yet supported for model type: " + str(type(X)))
@@ -336,7 +341,7 @@ class TreeExplainer:
         # update the bias term, which is the last index in phi
         # (note the paper has this as phi_0 instead of phi_M)
         if condition == 0:
-            phi[-1,:] += tree.values[0,:]
+            phi[-1, :] += tree.values[0, :]
 
         # start the recursive algorithm
         tree_shap_recursive(
@@ -345,45 +350,6 @@ class TreeExplainer:
             x, x_missing, phi, 0, 0, self.feature_indexes, self.zero_fractions, self.one_fractions, self.pweights,
             1, 1, -1, condition, condition_feature, 1
         )
-
-    def coalition_value(self, x, _S):
-        def desc(_set, v, tree):
-            if tree.features[v] == -2:  # is a leaf
-                return tree.values[v]
-            else:
-                if tree.features[v] in _S:
-                    if x[tree.features[v]] < tree.thresholds[v]:
-                        return desc(_S, tree.children_left[v], tree)
-                    else:
-                        return desc(_S, tree.children_right[v], tree)
-                else:
-                    r = [_x / tree.node_sample_weight[0] for _x in tree.node_sample_weight]
-                    return (r[tree.children_left[v]] * desc(_S, tree.children_left[v], tree) +
-                            r[tree.children_right[v]] * desc(_S, tree.children_right[v], tree)) / r[v]
-
-        return (reduce(lambda a, b: a + b, [desc(_S, 0, i) for i in self.trees])) / len(self.trees)
-
-    def brute_shap(self, x, i):
-        to_return = 0
-        n = len(x)
-        p = [_a for _a in list(range(n)) if _a != i]
-        for _S in powerset(p):
-            _tmp = (product(range(1, n - len(_S))) / product(range(len(_S) + 1, n)))
-            _tmp *= (self.coalition_value(x, _S + [i]) - self.coalition_value(x, _S))
-            to_return += _tmp
-
-        return to_return / len(x)
-
-    def brute_banz(self, x, i):  #TODO uogolnic obie metody
-        to_return = 0
-        n = len(x)
-        p = [_a for _a in list(range(n)) if _a != i]
-        for _S in powerset(p):
-            # _tmp = (product(range(1, n - len(_S))) / product(range(len(_S) + 1, n)))
-            _tmp = (self.coalition_value(x, _S + [i]) - self.coalition_value(x, _S))
-            to_return += _tmp
-
-        return to_return / 2 ** (n - 1)
 
     def tree_banz_jit(self, trees, all_features, x, betas, deltas, deltas_star, H, B, S):
         return proper_tree_banz(trees, all_features, x, betas, deltas, deltas_star, H, B, S)
@@ -403,11 +369,10 @@ class TreeExplainer:
             samples = tree.node_sample_weight
             return [el / samples[0] for el in samples]
 
-        # TODO przejrzec wszystkie petle - czy dobre limity?
         to_return = np.zeros(len(x), dtype=np.float64)
-        for i in all_features: # to nam daje maksimum
-            betas[i] = 1.0 #TODO byc moze niepotrzebne
-            deltas[i] = 1.0 #jw
+        for i in all_features:  # to nam daje maksimum
+            betas[i] = 1.0  # TODO byc moze niepotrzebne
+            deltas[i] = 1.0  # jw
             H[i] = stack()
             # TODO wyzerowac inne!
         F = []
@@ -416,14 +381,14 @@ class TreeExplainer:
             parents = _get_parents(t)
             proba_list = _count_node_proba(t)
 
-            p = 0 # root ma zawsze id == 0
+            p = 0  # root ma zawsze id == 0
             for v in [t.children_left[p], t.children_right[p]]:
                 traverse(v, 0, t, t.features, x, betas, deltas, H, B, proba_list, deltas_star, F, trees.index(t) == 0)
                 fast(v, 0, t, t.features, x, betas, deltas, H, B, S)
 
             for v in range(1, len(t.children_right)):
                 parent = parents[v]
-                to_return[t.features[parent]] += 2 * (deltas_star[v] - 1) / (1 + deltas_star[v]) * B[v] # TODO deltas z * sa w algorytmie
+                to_return[t.features[parent]] += 2 * (deltas_star[v] - 1) / (1 + deltas_star[v]) * B[v]  # TODO deltas z * sa w algorytmie
 
         # print("betas orig:")
         # print(betas)
@@ -431,7 +396,7 @@ class TreeExplainer:
         return list(map(lambda a: a / len(trees), to_return))
 
 
-#@numba.jit(nopython=True, nogil=True)
+# @numba.jit(nopython=True, nogil=True)
 def proper_tree_banz(trees, all_features, x, betas, deltas, deltas_star, H, B, S):
     def _get_parents(tree):
         parents_list = [None] * len(tree.children_right)
@@ -477,7 +442,7 @@ def proper_tree_banz(trees, all_features, x, betas, deltas, deltas_star, H, B, S
 
 
 # extend our decision path with a fraction of one and zero extensions
-#@numba.jit(nopython=True, nogil=True)
+# @numba.jit(nopython=True, nogil=True)
 def extend_path(feature_indexes, zero_fractions, one_fractions, pweights,
                 unique_depth, zero_fraction, one_fraction, feature_index):
     feature_indexes[unique_depth] = feature_index
@@ -492,8 +457,9 @@ def extend_path(feature_indexes, zero_fractions, one_fractions, pweights,
         pweights[i + 1] += one_fraction * pweights[i] * (i + 1.) / (unique_depth + 1.)
         pweights[i] = zero_fraction * pweights[i] * (unique_depth - i) / (unique_depth + 1.)
 
+
 # undo a previous extension of the decision path
-#@numba.jit(nopython=True, nogil=True)
+# @numba.jit(nopython=True, nogil=True)
 def unwind_path(feature_indexes, zero_fractions, one_fractions, pweights,
                 unique_depth, path_index):
     one_fraction = one_fractions[path_index]
@@ -513,9 +479,10 @@ def unwind_path(feature_indexes, zero_fractions, one_fractions, pweights,
         zero_fractions[i] = zero_fractions[i + 1]
         one_fractions[i] = one_fractions[i + 1]
 
+
 # determine what the total permuation weight would be if
 # we unwound a previous extension in the decision path
-#@numba.jit(nopython=True, nogil=True)
+# @numba.jit(nopython=True, nogil=True)
 def unwound_path_sum(feature_indexes, zero_fractions, one_fractions, pweights, unique_depth, path_index):
     one_fraction = one_fractions[path_index]
     zero_fraction = zero_fractions[path_index]
@@ -552,14 +519,13 @@ class Tree:
         if str(type(tree)).endswith("'sklearn.tree._tree.Tree'>"):
             self.children_left = tree.children_left.astype(np.int32)
             self.children_right = tree.children_right.astype(np.int32)
-            self.children_default = self.children_left # missing values not supported in sklearn
+            self.children_default = self.children_left  # missing values not supported in sklearn
             self.features = tree.feature.astype(np.int32)
             self.thresholds = tree.threshold.astype(np.float64)
             if normalize:
-                self.values = (tree.value[:,0,:].T / tree.value[:,0,:].sum(1)).T
+                self.values = (tree.value[:, 0, :].T / tree.value[:, 0, :].sum(1)).T
             else:
-                self.values = tree.value[:,0,:]
-
+                self.values = tree.value[:, 0, :]
 
             self.node_sample_weight = tree.weighted_n_node_samples.astype(np.float64)
 
@@ -569,10 +535,11 @@ class Tree:
                 self.values, 0
             )
 
-#@numba.jit(nopython=True)
+
+# @numba.jit(nopython=True)
 def compute_expectations(children_left, children_right, node_sample_weight, values, i, depth=0):
     if children_right[i] == -1:
-        values[i,:] = values[i,:]
+        values[i, :] = values[i, :]
         return 0
     else:
         li = children_left[i]
@@ -581,17 +548,18 @@ def compute_expectations(children_left, children_right, node_sample_weight, valu
         depth_right = compute_expectations(children_left, children_right, node_sample_weight, values, ri, depth + 1)
         left_weight = node_sample_weight[li]
         right_weight = node_sample_weight[ri]
-        v = (left_weight * values[li,:] + right_weight * values[ri,:]) / (left_weight + right_weight)
-        values[i,:] = v
+        v = (left_weight * values[li, :] + right_weight * values[ri, :]) / (left_weight + right_weight)
+        values[i, :] = v
         return max(depth_left, depth_right) + 1
 
+
 # recursive computation of SHAP values for a decision tree
-#@numba.jit(nopython=True, nogil=True)
-def tree_shap_recursive(children_left, children_right, children_default, features, thresholds, values, node_sample_weight,
+# @numba.jit(nopython=True, nogil=True)
+def tree_shap_recursive(children_left, children_right, children_default, features, thresholds, values,
+                        node_sample_weight,
                         x, x_missing, phi, node_index, unique_depth, parent_feature_indexes,
                         parent_zero_fractions, parent_one_fractions, parent_pweights, parent_zero_fraction,
                         parent_one_fraction, parent_feature_index, condition, condition_feature, condition_fraction):
-
     # stop if we have no weight coming down to us
     if condition_fraction == 0.:
         return
@@ -616,9 +584,10 @@ def tree_shap_recursive(children_left, children_right, children_default, feature
 
     # leaf node
     if children_right[node_index] == -1:
-        for i in range(1, unique_depth+1):
+        for i in range(1, unique_depth + 1):
             w = unwound_path_sum(feature_indexes, zero_fractions, one_fractions, pweights, unique_depth, i)
-            phi[feature_indexes[i],:] += w * (one_fractions[i] - zero_fractions[i]) * values[node_index,:] * condition_fraction
+            phi[feature_indexes[i], :] += w * (one_fractions[i] - zero_fractions[i]) * values[node_index,
+                                                                                       :] * condition_fraction
 
     # internal node
     else:
@@ -668,7 +637,7 @@ def tree_shap_recursive(children_left, children_right, children_default, feature
             children_left, children_right, children_default, features, thresholds, values, node_sample_weight,
             x, x_missing, phi, hot_index, unique_depth + 1,
             feature_indexes, zero_fractions, one_fractions, pweights,
-            hot_zero_fraction * incoming_zero_fraction, incoming_one_fraction,
+                                          hot_zero_fraction * incoming_zero_fraction, incoming_one_fraction,
             split_index, condition, condition_feature, hot_condition_fraction
         )
 
@@ -676,11 +645,13 @@ def tree_shap_recursive(children_left, children_right, children_default, feature
             children_left, children_right, children_default, features, thresholds, values, node_sample_weight,
             x, x_missing, phi, cold_index, unique_depth + 1,
             feature_indexes, zero_fractions, one_fractions, pweights,
-            cold_zero_fraction * incoming_zero_fraction, 0,
+                                           cold_zero_fraction * incoming_zero_fraction, 0,
             split_index, condition, condition_feature, cold_condition_fraction
         )
 
-def tree_banz_recursive(children_left, children_right, children_default, features, thresholds, values, node_sample_weight,
+
+def tree_banz_recursive(children_left, children_right, children_default, features, thresholds, values,
+                        node_sample_weight,
                         x, x_missing, phi, node_index, unique_depth, parent_feature_indexes,
                         parent_zero_fractions, parent_one_fractions, parent_pweights, parent_zero_fraction,
                         parent_one_fraction, parent_feature_index, condition, condition_feature, condition_fraction):
@@ -688,11 +659,11 @@ def tree_banz_recursive(children_left, children_right, children_default, feature
 
 
 def traverse(node, parent, tree, features, x, betas, deltas, H, B, r, deltas_star, F, should_print):
-    if node == -1: # leaf
+    if node == -1:  # leaf
         return
     # print("jestem w node nr {}".format(node))
 
-    if features[parent] in F: # TODO ?? node.feature?
+    if features[parent] in F:  # TODO ?? node.feature?
         present = True
         b = 2 / (1 + deltas[features[parent]]) * betas[parent]
     else:
@@ -701,7 +672,8 @@ def traverse(node, parent, tree, features, x, betas, deltas, H, B, r, deltas_sta
         b = betas[parent]
 
     delta_old = deltas[features[parent]]
-    deltas[features[parent]] = deltas[features[parent]] * (r[parent] / r[node]) #TODO to sa pstwa pojscia do wierzcholka - policzyc wczesniej!
+    deltas[features[parent]] = deltas[features[parent]] * (
+                r[parent] / r[node])  # TODO to sa pstwa pojscia do wierzcholka - policzyc wczesniej!
     if node == tree.children_left[parent]:
         deltas[features[parent]] = deltas[features[parent]] * float(x[features[parent]] < tree.thresholds[parent])
     else:
@@ -738,7 +710,7 @@ def fast(node, parent, tree, features, x, betas, deltas, H, B, S):
 
     H[features[parent]].append(node)
     if tree.children_left[node] == -1 and tree.children_right[node] == -1:
-        S[node] = betas[node] * tree.values[node] # nie do konca wiem co jest w tablicy tree.values
+        S[node] = betas[node] * tree.values[node]  # nie do konca wiem co jest w tablicy tree.values
     else:
         fast(tree.children_left[node], node, tree, features, x, betas, deltas, H, B, S)
         fast(tree.children_right[node], node, tree, features, x, betas, deltas, H, B, S)

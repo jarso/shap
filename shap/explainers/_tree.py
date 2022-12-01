@@ -52,7 +52,7 @@ class Tree(Explainer):
     implementations either inside an external model package or in the local compiled C extension.
     """
 
-    def __init__(self, model, data = None, model_output="raw", feature_perturbation="interventional", feature_names=None, approximate=False, **deprecated_options):
+    def __init__(self, model, data = None, model_output="raw", feature_perturbation="interventional", feature_names=None, approximate=False, banz=False, **deprecated_options):
         """ Build a new Tree explainer for the passed model.
 
         Parameters
@@ -151,6 +151,7 @@ class Tree(Explainer):
         #self.model_output = self.model.model_output # this allows the TreeEnsemble to translate model outputs types by how it loads the model
         
         self.approximate = approximate
+        self.banz = banz
 
         if feature_perturbation not in feature_perturbation_codes:
             raise ValueError("Invalid feature_perturbation option!")
@@ -203,7 +204,7 @@ class Tree(Explainer):
 
         return self.model.predict(self.data, np.ones(self.data.shape[0]) * y).mean(0)
 
-    def __call__(self, X, y=None, interactions=False, check_additivity=True):
+    def __call__(self, X, y=None, interactions=False, check_additivity=True, banz=False):
 
         start_time = time.time()
 
@@ -214,7 +215,8 @@ class Tree(Explainer):
             feature_names = getattr(self, "data_feature_names", None)
 
         if not interactions:
-            v = self.shap_values(X, y=y, from_call=True, check_additivity=check_additivity, approximate=self.approximate)
+            print("banz to: {}".format(banz or self.banz))
+            v = self.shap_values(X, y=y, from_call=True, check_additivity=check_additivity, approximate=self.approximate, banz=(self.banz or banz))
             if type(v) is list:
                 v = np.stack(v, axis=-1) # put outputs at the end
         else:
@@ -315,6 +317,8 @@ class Tree(Explainer):
             a list of such matrices, one for each output.
         """
         # see if we have a default tree_limit in place.
+
+        print("w shap_values, banz to: {}".format(banz))
         if tree_limit is None:
             tree_limit = -1 if self.model.tree_limit is None else self.model.tree_limit
 
@@ -393,8 +397,9 @@ class Tree(Explainer):
         # pprint(vars(self.model))
         phi = np.zeros((X.shape[0], X.shape[1]+1, self.model.num_outputs))
         if banz:
+            print("uzywam tree banz :>>>>>>>")
             _func = _cext.dense_tree_banz
-            check_additivity = False # TODO czemu sie nie sumuje?
+            check_additivity = False # TODO czemu sie nie sumuje? - bo aksjomat!!!
         else:
             _func = _cext.dense_tree_shap
 

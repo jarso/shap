@@ -503,13 +503,13 @@ inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset 
                 if (parent[v] == -1) {
                     continue;
                 }
-                feature_results[tree.features[parent[v]]] += 2 * B[v] * (deltas_star[v] - 1) / (1 + deltas_star[v]);
+                instance_out_contribs[tree.features[parent[v]]] += 2 * B[v] * (deltas_star[v] - 1) / (1 + deltas_star[v]);
             }
         }
 
-        for (unsigned i = 0; i < features_count; ++i) {
-            instance_out_contribs[i] = feature_results[i]; // / trees.tree_limit;
-        }
+//        for (unsigned i = 0; i < features_count; ++i) {
+//            instance_out_contribs[i] = feature_results[i]; // / trees.tree_limit;
+//        }
     }
 
     for (unsigned i = 0; i < features_count; ++i) {
@@ -531,7 +531,6 @@ inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset 
 
 static PyObject *_cext_dense_tree_banz(PyObject *self, PyObject *args)
 {
-    COUT("dense tree banz")
     PyObject *children_left_obj;
     PyObject *children_right_obj;
     PyObject *children_default_obj;
@@ -637,9 +636,7 @@ static PyObject *_cext_dense_tree_banz(PyObject *self, PyObject *args)
     );
     ExplanationDataset data = ExplanationDataset(X, X_missing, y, R, R_missing, num_X, M, num_R);
 
-    COUT("dense tree banz 2")
     dense_tree_banz(trees, data, out_contribs, feature_dependence, model_output, interactions);
-    COUT("dense tree banz 3")
 
     // retrieve return value before python cleanup of objects
     tfloat ret_value = (double)values[0];
@@ -667,7 +664,6 @@ static PyObject *_cext_dense_tree_banz(PyObject *self, PyObject *args)
 }
 
 void dense_tree_predict(tfloat *out, const TreeEnsemble &trees, const ExplanationDataset &data, unsigned model_transform) {
-    COUT("test")
     tfloat *row_out = out;
     const tfloat *x = data.X;
     const bool *x_missing = data.X_missing;

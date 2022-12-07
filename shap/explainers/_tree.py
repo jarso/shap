@@ -218,6 +218,8 @@ class Tree(Explainer):
         if not interactions:
             v = self.shap_values(X, y=y, from_call=True, check_additivity=check_additivity, approximate=self.approximate,
                                  banz=self.use_banz )
+            print("oto values:")
+            print(v)
             if type(v) is list:
                 v = np.stack(v, axis=-1) # put outputs at the end
         else:

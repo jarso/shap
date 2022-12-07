@@ -385,16 +385,37 @@ inline void traverse(int node, const tfloat *x, int* parent_list, TreeEnsemble& 
         b = betas[parent];
     }
     delta_old = deltas[features[parent]];
-    deltas[features[parent]] = deltas[features[parent]] * (r[parent] / r[node]);
+//    cout << "deltas[features[parent]] NAJPIERW = " << deltas[features[parent]] << endl;
+    deltas[features[parent]] = deltas[features[parent]] * r[parent];
+//    cout << "deltas[features[parent]] POTEM = " << deltas[features[parent]] << endl;
 
     if (node == tree.children_left[parent]) {
         deltas[features[parent]] *= double(x[features[parent]] < tree.thresholds[parent]);
+//        cout << "ale1 czy weszlismy? " << double(x[features[parent]] < tree.thresholds[parent]) << endl;
     } else {
         deltas[features[parent]] *= double(x[features[parent]] >= tree.thresholds[parent]);
+//        cout << "ale2 czy weszlismy? " << double(x[features[parent]] >= tree.thresholds[parent]) << endl;
     }
+
+    if (r[node] != 0) {
+        deltas[features[parent]] /= r[node];
+    } else {
+//        if ((node == tree.children_left[parent]) && (x[features[parent]] < tree.thresholds[parent]))
+//            cout << "p1owinnismy byli pomnozyc" << endl;
+
+//        if ((node == tree.children_right[parent]) && (x[features[parent]] >= tree.thresholds[parent]))
+//            cout << "p2owinnismy byli pomnozyc" << endl;
+    }
+
     deltas_star[node] = deltas[features[parent]];
 
-    b = b * (r[node] / r[parent]);
+//    std::cout << "tworze betas" << endl;
+//    cout << "r[node] = " << r[node] << endl;
+//    cout << "r[parent] = " << r[parent] << endl;
+//    cout << "deltas[features[parent]] = " << deltas[features[parent]] << endl;
+    if (r[parent] != 0) {
+        b = b * (r[node] / r[parent]);
+    }
     betas[node] = b * (1 + deltas[features[parent]]) / 2;
 
     traverse(tree.children_left[node], x, parent_list, tree, features_count, feature_results, betas,
@@ -421,6 +442,10 @@ inline void fast(int node, int* parent_list, TreeEnsemble& tree, int features_co
 
     H[features[parent]]->push(node);
     if (tree.children_left[node] == -1 && tree.children_right[node] == -1) {
+//        std::cout << "sumujemy S" << std::endl;
+//        std::cout << "beta = " << betas[node] << std::endl;
+//        std::cout << "t.val = " << tree.values[node] << std::endl;
+//        std::cout << "koniec S" << std::endl;
         S[node] = betas[node] * tree.values[node];
     } else {
         fast(tree.children_left[node], parent_list, tree, features_count, feature_results, betas,
@@ -482,10 +507,31 @@ inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset 
 
         instance_out_contribs = out_contribs + j * (data.M + 1) * trees.num_outputs;
         data.get_x_instance(instance, j);
+//        std::cout << "oto dane: ";
+//        for (unsigned i = 0; i < instance.num_X; ++i) {
+//            std::cout << instance.X[i] << ", ";
+//        }
+//        std::cout << std::endl;
+
         // proper calculations
         for (unsigned i = 0; i < trees.tree_limit; ++i) {
             TreeEnsemble tree;
             trees.get_tree(tree, i);
+//            cout << "children left:" << endl;
+//            for (unsigned j = 0; j < max_nodes; j++) {
+//                cout << tree.children_left[j] << ", ";
+//            } cout << "]" << endl;
+//
+//            cout << "children right:" << endl;
+//            for (unsigned j = 0; j < max_nodes; j++) {
+//                cout << tree.children_right[j] << ", ";
+//            } cout << "]" << endl;
+//
+//            cout << "node_sample_weights: [" << endl;
+//            for (unsigned j = 0; j < max_nodes; j++) {
+//                cout << tree.node_sample_weights[j] << ", ";
+//            }
+//            cout << "]" << endl;
             set_parent(parent, max_nodes, tree);
 //            F->reset();
             unsigned root = 0; // ?? czy na pewno?
@@ -500,13 +546,21 @@ inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset 
                 if (parent[v] == -1) {
                     continue;
                 }
+//                cout << "wartosci:" << std::endl;
+//                cout << tree.features[parent[v]] << std::endl;
+//                cout << B[v] << std::endl;
+//                cout << deltas_star[v] << std::endl;
+//                cout << "koniec wartosci" << std::endl;
                 feature_results[tree.features[parent[v]]] += 2 * B[v] * (deltas_star[v] - 1) / (1 + deltas_star[v]);
             }
         }
 
+//        std::cout << "to policzylem:" << std::endl;
         for (unsigned i = 0; i < features_count; ++i) {
+//        std::cout << feature_results[i] << ", ";
             instance_out_contribs[i] = feature_results[i]; // / trees.tree_limit;
         }
+//        std::cout << std::endl;
     }
 
     for (unsigned i = 0; i < features_count; ++i) {

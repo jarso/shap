@@ -519,12 +519,9 @@ inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset 
             }
         }
 
-//        std::cout << "to policzylem:" << std::endl;
         for (unsigned i = 0; i < features_count; ++i) {
-//        std::cout << feature_results[i] << ", ";
             instance_out_contribs[i] = feature_results[i]; // / trees.tree_limit;
         }
-//        std::cout << std::endl;
     }
 
     for (unsigned i = 0; i < features_count; ++i) {

@@ -529,21 +529,15 @@ inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset 
                 if (parent[v] == -1) {
                     continue;
                 }
-//                cout << "wartosci:" << std::endl;
-//                cout << tree.features[parent[v]] << std::endl;
-//                cout << B[v] << std::endl;
-//                cout << deltas_star[v] << std::endl;
-//                cout << "koniec wartosci" << std::endl;
+
+                // tu nie trzeba nic zmieniac bo delta_star[v]=0 zalatwilo sprawe
                 feature_results[tree.features[parent[v]]] += 2 * B[v] * (deltas_star[v] - 1) / (1 + deltas_star[v]);
             }
         }
 
-//        std::cout << "to policzylem:" << std::endl;
         for (unsigned i = 0; i < features_count; ++i) {
-//        std::cout << feature_results[i] << ", ";
             instance_out_contribs[i] = feature_results[i]; // / trees.tree_limit;
         }
-//        std::cout << std::endl;
     }
 
     for (unsigned i = 0; i < features_count; ++i) {

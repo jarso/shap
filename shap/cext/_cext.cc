@@ -385,44 +385,27 @@ inline void traverse(int node, const tfloat *x, int* parent_list, TreeEnsemble& 
         b = betas[parent];
     }
     delta_old = deltas[features[parent]];
-//    cout << "deltas[features[parent]] NAJPIERW = " << deltas[features[parent]] << endl;
-    deltas[features[parent]] = deltas[features[parent]] * r[parent];
-//    cout << "deltas[features[parent]] POTEM = " << deltas[features[parent]] << endl;
 
     if (node == tree.children_left[parent]) {
         deltas[features[parent]] *= double(x[features[parent]] < tree.thresholds[parent]);
-//        cout << "ale1 czy weszlismy? " << double(x[features[parent]] < tree.thresholds[parent]) << endl;
     } else {
         deltas[features[parent]] *= double(x[features[parent]] >= tree.thresholds[parent]);
-//        cout << "ale2 czy weszlismy? " << double(x[features[parent]] >= tree.thresholds[parent]) << endl;
     }
 
-    if (r[node] != 0) {
-        deltas[features[parent]] /= r[node];
+    if (r[node] == 0) {
+        deltas_star[node] = 0;
+        betas[node] = b * deltas[features[parent]] / 2;
     } else {
-//        if ((node == tree.children_left[parent]) && (x[features[parent]] < tree.thresholds[parent]))
-//            cout << "p1owinnismy byli pomnozyc" << endl;
+        deltas[features[parent]] = deltas[features[parent]] * r[parent] / r[node];
+        deltas_star[node] = deltas[features[parent]];
+        betas[node] = b * r[node] / r[parent] * (1 + deltas[features[parent]]) / 2;
 
-//        if ((node == tree.children_right[parent]) && (x[features[parent]] >= tree.thresholds[parent]))
-//            cout << "p2owinnismy byli pomnozyc" << endl;
+        traverse(tree.children_left[node], x, parent_list, tree, features_count, feature_results, betas,
+            deltas, deltas_star, B, S, F, H, r);
+
+        traverse(tree.children_right[node], x, parent_list, tree, features_count, feature_results, betas,
+            deltas, deltas_star, B, S, F, H, r);
     }
-
-    deltas_star[node] = deltas[features[parent]];
-
-//    std::cout << "tworze betas" << endl;
-//    cout << "r[node] = " << r[node] << endl;
-//    cout << "r[parent] = " << r[parent] << endl;
-//    cout << "deltas[features[parent]] = " << deltas[features[parent]] << endl;
-    if (r[parent] != 0) {
-        b = b * (r[node] / r[parent]);
-    }
-    betas[node] = b * (1 + deltas[features[parent]]) / 2;
-
-    traverse(tree.children_left[node], x, parent_list, tree, features_count, feature_results, betas,
-        deltas, deltas_star, B, S, F, H, r);
-
-    traverse(tree.children_right[node], x, parent_list, tree, features_count, feature_results, betas,
-        deltas, deltas_star, B, S, F, H, r);
 
     if (!present) {
         F->erase(features[parent]);

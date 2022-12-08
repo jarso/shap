@@ -490,31 +490,11 @@ inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset 
 
         instance_out_contribs = out_contribs + j * (data.M + 1) * trees.num_outputs;
         data.get_x_instance(instance, j);
-//        std::cout << "oto dane: ";
-//        for (unsigned i = 0; i < instance.num_X; ++i) {
-//            std::cout << instance.X[i] << ", ";
-//        }
-//        std::cout << std::endl;
 
         // proper calculations
         for (unsigned i = 0; i < trees.tree_limit; ++i) {
             TreeEnsemble tree;
             trees.get_tree(tree, i);
-//            cout << "children left:" << endl;
-//            for (unsigned j = 0; j < max_nodes; j++) {
-//                cout << tree.children_left[j] << ", ";
-//            } cout << "]" << endl;
-//
-//            cout << "children right:" << endl;
-//            for (unsigned j = 0; j < max_nodes; j++) {
-//                cout << tree.children_right[j] << ", ";
-//            } cout << "]" << endl;
-//
-//            cout << "node_sample_weights: [" << endl;
-//            for (unsigned j = 0; j < max_nodes; j++) {
-//                cout << tree.node_sample_weights[j] << ", ";
-//            }
-//            cout << "]" << endl;
             set_parent(parent, max_nodes, tree);
 //            F->reset();
             unsigned root = 0; // ?? czy na pewno?
@@ -529,12 +509,13 @@ inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset 
                 if (parent[v] == -1) {
                     continue;
                 }
-//                cout << "wartosci:" << std::endl;
-//                cout << tree.features[parent[v]] << std::endl;
-//                cout << B[v] << std::endl;
-//                cout << deltas_star[v] << std::endl;
-//                cout << "koniec wartosci" << std::endl;
-                feature_results[tree.features[parent[v]]] += 2 * B[v] * (deltas_star[v] - 1) / (1 + deltas_star[v]);
+
+                if ((tree.node_sample_weights[v] == 0) && ) {
+                    feature_results[tree.features[parent[v]]] += (2 * B[v]);
+                } else {
+                    feature_results[tree.features[parent[v]]] += (2 * B[v] * (deltas_star[v] - 1) / (1 + deltas_star[v]));
+                }
+
             }
         }
 

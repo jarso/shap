@@ -53,7 +53,7 @@ class Tree(Explainer):
     """
 
     def __init__(self, model, data = None, model_output="raw", feature_perturbation="interventional", feature_names=None,
-                 approximate=False, use_banz=False, **deprecated_options):
+                 approximate=False, use_banz=False, change_deltas=False, **deprecated_options):
         """ Build a new Tree explainer for the passed model.
 
         Parameters
@@ -153,6 +153,7 @@ class Tree(Explainer):
         
         self.approximate = approximate
         self.use_banz = use_banz
+        self.change_deltas = change_deltas
 
         if feature_perturbation not in feature_perturbation_codes:
             raise ValueError("Invalid feature_perturbation option!")
@@ -217,7 +218,7 @@ class Tree(Explainer):
 
         if not interactions:
             v = self.shap_values(X, y=y, from_call=True, check_additivity=check_additivity, approximate=self.approximate,
-                                 banz=self.use_banz )
+                                 banz=self.use_banz, change_deltas=self.change_deltas )
             print("oto values:")
             print(v)
             if type(v) is list:
@@ -284,7 +285,8 @@ class Tree(Explainer):
         return X, y, X_missing, flat_output, tree_limit, check_additivity
 
 
-    def shap_values(self, X, y=None, tree_limit=None, approximate=False, check_additivity=True, from_call=False, banz=False):
+    def shap_values(self, X, y=None, tree_limit=None, approximate=False, check_additivity=True, from_call=False,
+                    banz=False, change_deltas=False):
         """ Estimate the SHAP values for a set of samples.
 
         Parameters
@@ -407,13 +409,22 @@ class Tree(Explainer):
             _func = _cext.dense_tree_shap
 
         if not approximate:
-            _func(
-                self.model.children_left, self.model.children_right, self.model.children_default,
-                self.model.features, self.model.thresholds, self.model.values, self.model.node_sample_weight,
-                self.model.max_depth, X, X_missing, y, self.data, self.data_missing, tree_limit,
-                self.model.base_offset, phi, feature_perturbation_codes[self.feature_perturbation],
-                output_transform_codes[transform], False
-            )
+            if banz:
+                _func(
+                    self.model.children_left, self.model.children_right, self.model.children_default,
+                    self.model.features, self.model.thresholds, self.model.values, self.model.node_sample_weight,
+                    self.model.max_depth, X, X_missing, y, self.data, self.data_missing, tree_limit,
+                    self.model.base_offset, phi, feature_perturbation_codes[self.feature_perturbation],
+                    output_transform_codes[transform], False, change_deltas
+                )
+            else:
+                _func(
+                    self.model.children_left, self.model.children_right, self.model.children_default,
+                    self.model.features, self.model.thresholds, self.model.values, self.model.node_sample_weight,
+                    self.model.max_depth, X, X_missing, y, self.data, self.data_missing, tree_limit,
+                    self.model.base_offset, phi, feature_perturbation_codes[self.feature_perturbation],
+                    output_transform_codes[transform], False
+                )
         else:
             _cext.dense_tree_saabas(
                 self.model.children_left, self.model.children_right, self.model.children_default,

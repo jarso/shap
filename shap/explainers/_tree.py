@@ -521,6 +521,8 @@ class Tree(Explainer):
         # run the core algorithm using the C extension
         assert_import("cext")
         phi = np.zeros((X.shape[0], X.shape[1]+1, X.shape[1]+1, self.model.num_outputs))
+        if 0 in self.model.node_sample_weight:
+            print("mamy prenstwo 0")
         _cext.dense_tree_shap(
             self.model.children_left, self.model.children_right, self.model.children_default,
             self.model.features, self.model.thresholds, self.model.values, self.model.node_sample_weight,
@@ -538,7 +540,7 @@ class Tree(Explainer):
             if flat_output:
                 out = phi[0, :-1, :-1, 0]
             else:
-                out = phi[:, :-1, :-1, 0]
+                out = phi[:, :-1, :-1, 0]res_shap_cext = [res_shap_cext[(i, 0)] for i in range(100, 1000, 100)]
         else:
             self.expected_value = [phi[0, -1, -1, i] for i in range(phi.shape[3])]
             if flat_output:

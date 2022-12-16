@@ -540,7 +540,7 @@ class Tree(Explainer):
             if flat_output:
                 out = phi[0, :-1, :-1, 0]
             else:
-                out = phi[:, :-1, :-1, 0]res_shap_cext = [res_shap_cext[(i, 0)] for i in range(100, 1000, 100)]
+                out = phi[:, :-1, :-1, 0]
         else:
             self.expected_value = [phi[0, -1, -1, i] for i in range(phi.shape[3])]
             if flat_output:

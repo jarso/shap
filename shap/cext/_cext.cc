@@ -425,7 +425,7 @@ inline void fast(int node, int* parent_list, TreeEnsemble& tree, int features_co
 
     H[features[parent]]->push(node);
     if (tree.children_left[node] == -1 && tree.children_right[node] == -1) {
-//        std::cout << "sumujemy S" << std::endl;
+//        std::  << "sumujemy S" << std::endl;
 //        std::cout << "beta = " << betas[node] << std::endl;
 //        std::cout << "t.val = " << tree.values[node] << std::endl;
 //        std::cout << "koniec S" << std::endl;
@@ -456,9 +456,8 @@ inline void fast(int node, int* parent_list, TreeEnsemble& tree, int features_co
 
 inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset &data, tfloat *out_contribs,
                      const int feature_dependence, unsigned model_transform, bool interactions, bool useDeltaStar) {
-
     ExplanationDataset instance;
-    tfloat* instance_out_contribs = out_contribs;
+    tfloat* instance_out_contribs;
 
     // initializing values
     int features_count = data.M;

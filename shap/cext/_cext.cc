@@ -275,12 +275,6 @@ static void set_parent(int *parent, int size, TreeEnsemble &tree)
 }
 */
 
-
-
-inline void proper_tree_banz(const TreeEnsemble& trees, const ExplanationDataset &data, tfloat *out_contribs) {
-    return;
-}
-
 /*
 inline void fast(int node, int* parent_list, TreeEnsemble& tree, int features_count, double* feature_results,
     double* betas, double* deltas, double* deltas_star, double* B, double* S, std::set<int>* F, 
@@ -455,7 +449,7 @@ inline void fast(int node, int* parent_list, TreeEnsemble& tree, int features_co
 
 
 inline void dense_tree_banz(const TreeEnsemble& trees, const ExplanationDataset &data, tfloat *out_contribs,
-                     const int feature_dependence, unsigned model_transform, bool interactions, bool useDeltaStar) {
+        bool useDeltaStar) {
     ExplanationDataset instance;
     tfloat* instance_out_contribs;
 
@@ -557,19 +551,16 @@ static PyObject *_cext_dense_tree_banz(PyObject *self, PyObject *args)
     PyObject *R_obj;
     PyObject *R_missing_obj;
     int tree_limit;
-    PyObject *out_contribs_obj; // tu jest output
-    int feature_dependence;
-    int model_output;
+    PyObject *out_contribs_obj; // holds the output
     PyObject *base_offset_obj;
-    bool interactions;
     bool useDeltaStar;
 
     /* Parse the input tuple */
     if (!PyArg_ParseTuple(
-        args, "OOOOOOOiOOOOOiOOiibb", &children_left_obj, &children_right_obj, &children_default_obj,
+        args, "OOOOOOOiOOOOOiOOb", &children_left_obj, &children_right_obj, &children_default_obj,
         &features_obj, &thresholds_obj, &values_obj, &node_sample_weights_obj,
         &max_depth, &X_obj, &X_missing_obj, &y_obj, &R_obj, &R_missing_obj, &tree_limit, &base_offset_obj,
-        &out_contribs_obj, &feature_dependence, &model_output, &interactions, &useDeltaStar
+        &out_contribs_obj, /*&feature_dependence, /*&model_output, &interactions,*/ &useDeltaStar
     )) return NULL;
 
     /* Interpret the input objects as numpy arrays. */
@@ -649,7 +640,7 @@ static PyObject *_cext_dense_tree_banz(PyObject *self, PyObject *args)
     );
     ExplanationDataset data = ExplanationDataset(X, X_missing, y, R, R_missing, num_X, M, num_R);
 
-    dense_tree_banz(trees, data, out_contribs, feature_dependence, model_output, interactions, useDeltaStar);
+    dense_tree_banz(trees, data, out_contribs, useDeltaStar);
 
     // retrieve return value before python cleanup of objects
     tfloat ret_value = (double)values[0];

@@ -322,7 +322,7 @@ class Tree(Explainer):
             a list of such matrices, one for each output.
         """
         # see if we have a default tree_limit in place.
-        print("uruchamiam z BANZ={}".format(banz))
+        print("running with BANZ={}".format(banz))
 
         if tree_limit is None:
             tree_limit = -1 if self.model.tree_limit is None else self.model.tree_limit
@@ -398,8 +398,6 @@ class Tree(Explainer):
         # run the core algorithm using the C extension
         assert_import("cext")
         print("using treeshap and cext")
-        # print("tree:")
-        # pprint(vars(self.model))
         phi = np.zeros((X.shape[0], X.shape[1]+1, self.model.num_outputs))
         if banz:
             print("using BANZ")
@@ -414,8 +412,7 @@ class Tree(Explainer):
                     self.model.children_left, self.model.children_right, self.model.children_default,
                     self.model.features, self.model.thresholds, self.model.values, self.model.node_sample_weight,
                     self.model.max_depth, X, X_missing, y, self.data, self.data_missing, tree_limit,
-                    self.model.base_offset, phi, feature_perturbation_codes[self.feature_perturbation],
-                    output_transform_codes[transform], False, change_deltas
+                    self.model.base_offset, phi, change_deltas
                 )
             else:
                 _func(

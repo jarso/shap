@@ -202,10 +202,14 @@ def run_setup(with_binary, test_xgboost, test_lightgbm, test_catboost, test_spar
     extras_require['all'] = list(set(i for val in extras_require.values() for i in val))
 
     setup(
-        name='shap',
+        name='shap-banz',
         version=find_version("shap", "__init__.py"),
-        description='A unified approach to explain the output of any machine learning model.',
-        long_description="SHAP (SHapley Additive exPlanations) is a unified approach to explain "
+        description='A fork of SHAP with BANZ algorithm implementation',
+        long_description="BANZ algorithm is proposed in " + \
+                         "\"Improved Feature Importance Computations for Tree Models: Shapley vs. Banzhaf\"" + \
+                         "and here it is implemented in a fork of SHAP library by Scott Lundberg, which can be found here:\n" + \
+                         "http://github.com/slundberg/shap \n" + \
+                         "SHAP (SHapley Additive exPlanations) is a unified approach to explain "
                          "the output of " + \
                          "any machine learning model. SHAP connects game theory with local "
                          "explanations, uniting " + \
@@ -213,9 +217,9 @@ def run_setup(with_binary, test_xgboost, test_lightgbm, test_catboost, test_spar
                          "and locally accurate " + \
                          "additive feature attribution method based on expectations.",
         long_description_content_type="text/markdown",
-        url='http://github.com/slundberg/shap',
-        author='Scott Lundberg',
-        author_email='slund1@cs.washington.edu',
+        url='http://github.com/jarso/shap-banz',
+        author='Jaroslaw Socha',
+        author_email='jaroslaw.socha@ideas-ncbr.pl',
         license='MIT',
         packages=[
             'shap', 'shap.explainers', 'shap.explainers.other', 'shap.explainers._deep',
@@ -238,6 +242,7 @@ def run_setup(with_binary, test_xgboost, test_lightgbm, test_catboost, test_spar
             "Programming Language :: Python :: 3.8",
             "Programming Language :: Python :: 3.9",
             "Programming Language :: Python :: 3.10",
+            "Programming Language :: Python :: 3.11",
         ],
         zip_safe=False
         # python_requires='>3.0' we will add this at some point

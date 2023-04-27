@@ -1,4 +1,19 @@
+This package is a fork of SHAP library by Lundberg et al. enhanced with an implementation of a feature attribution algorithm for tree models that was proposed in the <a href="https://arxiv.org/pdf/2108.04126">Improved Feature Importance Computations for Tree Models: Shapley vs. Banzhaf</a> work. This paper was presented at the UAI 2022 Conference. The said algorithm is an improvement on the original TreeSHAP algorithm by Lundberg et al. in terms of computational complexity.
 
+You can use it by setting a `use_banz` parameter when creating a Tree explainer for it to always use the proposed algorithm when calculating the feature attribution, or by providing a `banz` parameter to the `shap_values()` method from the same class if you want to use it just once. Setting each of the parameters to `False` procides a default behaviour for these functionalities. The implementation is found both in the somewhat production-use-oriented C++ module, as well as the pure Python one, that is used just to showcase the general principles of the algorithm.
+
+Examples:
+```
+explainer = shap.explainers.Tree(model, use_banz=True)
+```
+or
+```
+explainer.shap_values(X, banz=True)
+```
+
+Below you can find a README for the original SHAP library:
+
+---
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/slundberg/shap/master/docs/artwork/shap_header.svg" width="800" />
